@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,7 +12,13 @@ import { Loader2 } from "lucide-react";
 
 export function LoginForm() {
   const router = useRouter();
-  const { login } = useAuth();
+  const { login, isAuthenticated, isReady } = useAuth();
+
+  useEffect(() => {
+    if (isReady && isAuthenticated) {
+      router.replace("/admin/dashboard");
+    }
+  }, [isReady, isAuthenticated, router]);
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);

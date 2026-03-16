@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +30,7 @@ export function QuestionnaireForm() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const form = useForm<QuestionnaireSchema>({
+    resolver: zodResolver(questionnaireSchema),
     defaultValues: {
       age: undefined as unknown as number,
       gender: undefined as unknown as "M" | "F",
@@ -40,20 +42,7 @@ export function QuestionnaireForm() {
 
   const validateCurrentStep = useCallback(async () => {
     const fields = STEP_FIELDS[step];
-    const result = await form.trigger(fields);
-    if (!result) return false;
-
-    const values = form.getValues();
-    for (const field of fields) {
-      const parsed = questionnaireSchema.shape[field].safeParse(values[field]);
-      if (!parsed.success) {
-        form.setError(field, {
-          message: parsed.error.issues[0]?.message,
-        });
-        return false;
-      }
-    }
-    return true;
+    return form.trigger(fields);
   }, [form, step]);
 
   const handleNext = useCallback(async () => {

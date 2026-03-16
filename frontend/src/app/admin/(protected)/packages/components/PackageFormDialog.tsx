@@ -1,14 +1,14 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { useForm } from "react-hook-form";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  createPackage,
-  updatePackage,
-  getPackageDetail,
-} from "@/lib/api-client";
+  usePackageDetail,
+  useCreatePackage,
+  useUpdatePackage,
+} from "@/hooks/useAdmin";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -26,7 +26,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
+import { SYMPTOM_OPTIONS, CHECKUP_ITEMS } from "@/lib/constants";
 import type { PackageFormData } from "@/types";
+
+const RELEVANCE_OPTIONS = [
+  { value: 0.2, label: "매우 낮음" },
+  { value: 0.4, label: "낮음" },
+  { value: 0.6, label: "보통" },
+  { value: 0.8, label: "높음" },
+  { value: 1.0, label: "매우 높음" },
+];
 
 interface PackageFormDialogProps {
   open: boolean;
@@ -41,13 +50,9 @@ export function PackageFormDialog({
   mode,
   packageId,
 }: PackageFormDialogProps) {
-  const queryClient = useQueryClient();
-
-  const { data: existing } = useQuery({
-    queryKey: ["admin-package-detail", packageId],
-    queryFn: () => getPackageDetail(packageId!),
-    enabled: mode === "edit" && packageId != null,
-  });
+  const { data: existing } = usePackageDetail(
+    mode === "edit" ? (packageId ?? null) : null
+  );
 
   const form = useForm<PackageFormData>({
     defaultValues: {
@@ -82,42 +87,77 @@ export function PackageFormDialog({
     }
   }, [existing, mode, form]);
 
-  const createMut = useMutation({
-    mutationFn: (data: PackageFormData) => createPackage(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-packages"] });
-      onOpenChange(false);
-      form.reset();
-    },
-  });
-
-  const updateMut = useMutation({
-    mutationFn: (data: PackageFormData) => updatePackage(packageId!, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-packages"] });
-      queryClient.invalidateQueries({
-        queryKey: ["admin-package-detail", packageId],
-      });
-      onOpenChange(false);
-    },
-  });
+  const createMut = useCreatePackage();
+  const updateMut = useUpdatePackage();
 
   const isPending = createMut.isPending || updateMut.isPending;
   const mutError = createMut.error || updateMut.error;
 
   const onSubmit = (data: PackageFormData) => {
     if (mode === "create") {
-      createMut.mutate(data);
+      createMut.mutate(data, {
+        onSuccess: () => {
+          onOpenChange(false);
+          form.reset();
+        },
+      });
     } else {
-      updateMut.mutate(data);
+      updateMut.mutate(
+        { id: packageId!, data },
+        { onSuccess: () => onOpenChange(false) }
+      );
     }
   };
 
   const targetGender = form.watch("target_gender");
+  const symptomTags = form.watch("symptom_tags");
+  const itemIds = form.watch("item_ids");
+
+  const selectedTagIds = useMemo(
+    () => new Set(symptomTags.map((t) => t.symptom_tag_id)),
+    [symptomTags]
+  );
+
+  const toggleTag = (tagId: number) => {
+    const current = form.getValues("symptom_tags");
+    if (selectedTagIds.has(tagId)) {
+      form.setValue(
+        "symptom_tags",
+        current.filter((t) => t.symptom_tag_id !== tagId)
+      );
+    } else {
+      form.setValue("symptom_tags", [
+        ...current,
+        { symptom_tag_id: tagId, relevance_score: 0.6 },
+      ]);
+    }
+  };
+
+  const updateTagRelevance = (tagId: number, score: number) => {
+    const current = form.getValues("symptom_tags");
+    form.setValue(
+      "symptom_tags",
+      current.map((t) =>
+        t.symptom_tag_id === tagId ? { ...t, relevance_score: score } : t
+      )
+    );
+  };
+
+  const toggleItem = (itemId: number) => {
+    const current = form.getValues("item_ids");
+    if (current.includes(itemId)) {
+      form.setValue(
+        "item_ids",
+        current.filter((id) => id !== itemId)
+      );
+    } else {
+      form.setValue("item_ids", [...current, itemId]);
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[80vh] overflow-y-auto">
+      <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-lg">
         <DialogTitle>
           {mode === "create" ? "패키지 추가" : "패키지 수정"}
         </DialogTitle>
@@ -195,6 +235,58 @@ export function PackageFormDialog({
                 type="number"
                 {...form.register("max_age", { valueAsNumber: true })}
               />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>증상 태그</Label>
+            <div className="max-h-40 overflow-y-auto rounded-lg border p-2 space-y-1">
+              {SYMPTOM_OPTIONS.map((symptom, idx) => {
+                const isSelected = selectedTagIds.has(idx + 1);
+                const tag = symptomTags.find((t) => t.symptom_tag_id === idx + 1);
+                return (
+                  <div key={symptom.code} className="flex items-center gap-2">
+                    <Checkbox
+                      checked={isSelected}
+                      onCheckedChange={() => toggleTag(idx + 1)}
+                    />
+                    <span className="flex-1 text-sm">{symptom.name}</span>
+                    {isSelected && (
+                      <select
+                        className="h-6 rounded border text-xs"
+                        value={tag?.relevance_score ?? 0.6}
+                        onChange={(e) =>
+                          updateTagRelevance(idx + 1, parseFloat(e.target.value))
+                        }
+                      >
+                        {RELEVANCE_OPTIONS.map((opt) => (
+                          <option key={opt.value} value={opt.value}>
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>검진 항목 (최소 1개)</Label>
+            <div className="max-h-40 overflow-y-auto rounded-lg border p-2 space-y-1">
+              {CHECKUP_ITEMS.map((item) => (
+                <Label
+                  key={item.id}
+                  className="flex cursor-pointer items-center gap-2 text-sm"
+                >
+                  <Checkbox
+                    checked={itemIds.includes(item.id)}
+                    onCheckedChange={() => toggleItem(item.id)}
+                  />
+                  <span>{item.name}</span>
+                </Label>
+              ))}
             </div>
           </div>
 

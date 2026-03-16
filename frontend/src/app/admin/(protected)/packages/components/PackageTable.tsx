@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getPackages, deletePackage } from "@/lib/api-client";
+import { usePackages, useDeletePackage } from "@/hooks/useAdmin";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -32,21 +31,11 @@ const GENDER_LABEL: Record<string, string> = {
 };
 
 export function PackageTable() {
-  const queryClient = useQueryClient();
   const [editId, setEditId] = useState<number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
 
-  const { data: packages, isLoading } = useQuery({
-    queryKey: ["admin-packages"],
-    queryFn: getPackages,
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: deletePackage,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-packages"] });
-    },
-  });
+  const { data: packages, isLoading } = usePackages();
+  const deleteMutation = useDeletePackage();
 
   if (isLoading) {
     return (
@@ -162,6 +151,7 @@ export function PackageTable() {
 
       {editId !== null && (
         <PackageFormDialog
+          key={editId}
           open={true}
           onOpenChange={(open) => { if (!open) setEditId(null); }}
           mode="edit"

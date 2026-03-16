@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/hooks/useAuth";
+import { Loader2 } from "lucide-react";
 
 export function AdminGuard({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isReady } = useAuth();
@@ -10,17 +11,19 @@ export function AdminGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (isReady && !isAuthenticated) {
-      router.push("/admin/login");
+      router.replace("/admin/login");
     }
   }, [isReady, isAuthenticated, router]);
 
-  if (!isReady || !isAuthenticated) {
+  if (!isReady) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <p className="text-sm text-muted-foreground">로딩 중...</p>
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
       </div>
     );
   }
+
+  if (!isAuthenticated) return null;
 
   return <>{children}</>;
 }

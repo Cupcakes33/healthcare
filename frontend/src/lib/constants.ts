@@ -50,6 +50,21 @@ export const EXISTING_CONDITIONS = [
   "암 병력",
 ];
 
+export const CHECKUP_ITEMS = [
+  { id: 1, code: "BLOOD_TEST_CBC", name: "일반혈액검사(CBC)" },
+  { id: 2, code: "BLOOD_TEST_LIPID", name: "혈중지질검사" },
+  { id: 3, code: "CHEST_XRAY", name: "흉부 X-ray" },
+  { id: 4, code: "ECG", name: "심전도" },
+  { id: 5, code: "GASTROSCOPY", name: "위내시경" },
+  { id: 6, code: "COLONOSCOPY", name: "대장내시경" },
+  { id: 7, code: "ABDOMINAL_US", name: "복부 초음파" },
+  { id: 8, code: "CT_CHEST", name: "흉부 CT" },
+  { id: 9, code: "MRI_BRAIN", name: "뇌 MRI" },
+  { id: 10, code: "THYROID_US", name: "갑상선 초음파" },
+  { id: 11, code: "LIVER_FUNCTION", name: "간기능검사" },
+  { id: 12, code: "KIDNEY_FUNCTION", name: "신기능검사" },
+];
+
 export const TOTAL_STEPS = 3;
 
 export const DISCLAIMER =

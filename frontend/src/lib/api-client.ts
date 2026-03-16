@@ -86,8 +86,9 @@ export async function getStats(): Promise<StatsResponse> {
   return response.json();
 }
 
-export async function getPackages(): Promise<PackageListItem[]> {
-  const response = await authFetch(`${API_BASE_URL}/admin/packages`);
+export async function getPackages(isActive?: boolean): Promise<PackageListItem[]> {
+  const params = isActive != null ? `?is_active=${isActive}` : "";
+  const response = await authFetch(`${API_BASE_URL}/admin/packages${params}`);
   if (!response.ok) throw new Error("패키지 목록을 불러올 수 없습니다");
   return response.json();
 }

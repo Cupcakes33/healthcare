@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import require_admin
 from app.core.database import get_db
-from app.domain.models import CheckupPackage, IntakeSession, Recommendation
+from app.domain.models import CheckupPackage, IntakeSession, Recommendation, SymptomTag
 from app.domain.schemas.admin import (
     PackageCount,
     StatsResponse,
@@ -22,7 +22,7 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
     age_dist = await _age_distribution(db)
     top_symptoms = await _top_symptoms(db)
     top_packages = await _top_packages(db)
-    red_flag = await _red_flag_ratio(db)
+    red_flag = await _red_flag_ratio(db, total)
 
     return StatsResponse(
         total_sessions=total,
@@ -57,9 +57,10 @@ async def _age_distribution(db: AsyncSession) -> dict:
 
 async def _top_symptoms(db: AsyncSession) -> list:
     stmt = text("""
-        SELECT tag, COUNT(*) as cnt
+        SELECT COALESCE(st.name, tag) AS symptom_name, COUNT(*) as cnt
         FROM intake_session, jsonb_array_elements_text(extracted_tags) AS tag
-        GROUP BY tag
+        LEFT JOIN symptom_tag st ON st.code = tag
+        GROUP BY symptom_name
         ORDER BY cnt DESC
         LIMIT 5
     """)
@@ -79,9 +80,7 @@ async def _top_packages(db: AsyncSession) -> list:
     return [PackageCount(name=row[0], count=row[1]) for row in result.all()]
 
 
-async def _red_flag_ratio(db: AsyncSession) -> float:
-    total_result = await db.execute(select(func.count(IntakeSession.id)))
-    total = total_result.scalar() or 0
+async def _red_flag_ratio(db: AsyncSession, total: int) -> float:
     if total == 0:
         return 0.0
 
