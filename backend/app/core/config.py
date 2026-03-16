@@ -19,7 +19,7 @@ class Settings(BaseSettings):
     MAX_RECOMMENDATIONS: int = 3
 
     ADMIN_USERNAME: str = "admin"
-    ADMIN_PASSWORD: str = "1111"
+    ADMIN_PASSWORD: str = ""
 
     model_config = {"env_file": ".env", "extra": "ignore"}
 
