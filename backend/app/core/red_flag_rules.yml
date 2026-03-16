@@ -1,0 +1,50 @@
+rules:
+  - level: EMERGENCY
+    required_symptoms:
+      - CHEST_PRESSURE
+      - ARM_RADIATING_PAIN
+    description: "흉부 압박감 + 팔 방사통"
+    message: "심장 관련 응급 증상이 의심됩니다. 즉시 119에 연락하거나 가까운 응급실을 방문하세요."
+
+  - level: EMERGENCY
+    required_symptoms:
+      - CHEST_PRESSURE
+      - JAW_RADIATING_PAIN
+    description: "흉부 압박감 + 턱 방사통"
+    message: "심장 관련 응급 증상이 의심됩니다. 즉시 119에 연락하거나 가까운 응급실을 방문하세요."
+
+  - level: EMERGENCY
+    required_symptoms:
+      - CHEST_PRESSURE
+      - BACK_RADIATING_PAIN
+    description: "흉부 압박감 + 등 방사통"
+    message: "심장 관련 응급 증상이 의심됩니다. 즉시 119에 연락하거나 가까운 응급실을 방문하세요."
+
+  - level: EMERGENCY
+    required_symptoms:
+      - THUNDERCLAP_HEADACHE
+    description: "벼락두통"
+    message: "뇌혈관 응급 상황이 의심됩니다. 즉시 응급실을 방문하세요."
+
+  - level: EMERGENCY
+    required_symptoms:
+      - UNILATERAL_PARALYSIS
+      - SPEECH_DISORDER
+    description: "편측 마비 + 언어장애"
+    message: "뇌졸중 의심 증상입니다. 즉시 119에 연락하세요."
+
+  - level: URGENT
+    required_symptoms:
+      - CHRONIC_COUGH
+      - WEIGHT_LOSS
+      - FATIGUE
+    description: "만성 기침 + 체중감소 + 피로"
+    message: "정밀 검사가 필요한 증상 조합입니다. 가능한 빨리 의료기관을 방문하세요."
+
+  - level: CAUTION
+    required_symptoms:
+      - UNEXPLAINED_WEIGHT_LOSS
+    description: "원인불명 체중감소"
+    message: "체중 변화에 대한 의료 상담을 권장합니다."
+
+default_message: "특이 소견이 없습니다."
