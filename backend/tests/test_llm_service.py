@@ -267,6 +267,40 @@ class TestAnalyzeQuestionnaire:
             )
 
     @pytest.mark.asyncio
+    async def test_retry_on_llm_service_error(
+        self, sample_questionnaire, sample_packages, sample_symptom_tags,
+        mock_provider, valid_llm_response_content,
+    ):
+        # given
+        mock_provider.generate.side_effect = [
+            LLMServiceError("API 일시적 오류"),
+            LLMResponse(content=valid_llm_response_content, model="gpt-4o-mini", provider="openai"),
+        ]
+
+        # when
+        result = await analyze_questionnaire(
+            sample_questionnaire, sample_packages, sample_symptom_tags, mock_provider,
+        )
+
+        # then
+        assert isinstance(result, LLMAnalysisResult)
+        assert mock_provider.generate.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_raises_llm_service_error_after_max_retries(
+        self, sample_questionnaire, sample_packages, sample_symptom_tags,
+        mock_provider,
+    ):
+        # given
+        mock_provider.generate.side_effect = LLMServiceError("API 지속 오류")
+
+        # when / then
+        with pytest.raises(LLMServiceError, match="API 지속 오류"):
+            await analyze_questionnaire(
+                sample_questionnaire, sample_packages, sample_symptom_tags, mock_provider,
+            )
+
+    @pytest.mark.asyncio
     async def test_filters_hallucinated_tags_and_packages(
         self, sample_questionnaire, sample_packages, sample_symptom_tags,
         mock_provider,

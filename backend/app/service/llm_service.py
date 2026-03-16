@@ -122,6 +122,7 @@ async def analyze_questionnaire(
         user_prompt=user_prompt,
     )
 
+    last_error: Exception = Exception("알 수 없는 오류")
     for attempt in range(settings.LLM_MAX_RETRIES + 1):
         try:
             response = await provider.generate(llm_request)
@@ -131,9 +132,14 @@ async def analyze_questionnaire(
                 result, valid_tag_codes, valid_package_ids,
             )
         except (json.JSONDecodeError, ValueError, KeyError) as e:
+            last_error = e
             if attempt >= settings.LLM_MAX_RETRIES:
                 raise LLMParsingError(
                     f"LLM 응답 파싱 실패: {e}"
                 ) from e
+        except LLMServiceError:
+            last_error = LLMServiceError
+            if attempt >= settings.LLM_MAX_RETRIES:
+                raise
 
-    raise LLMParsingError("LLM 응답 파싱 실패: 최대 재시도 초과")
+    raise LLMParsingError(f"LLM 응답 파싱 실패: 최대 재시도 초과: {last_error}")
