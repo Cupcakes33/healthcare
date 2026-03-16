@@ -11,3 +11,26 @@ spec/
 .idea/
 .vscode/
 *.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 환경변수
+.env
+.env.local
+.env.production
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+.pytest_cache/
+
+# Node
+node_modules/
+.next/
+
+# Docker
+docker-compose.override.yml
