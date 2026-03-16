@@ -36,6 +36,12 @@ class TestPatientAPIRoutes:
         })
         assert response.status_code == 422
 
-    def test_result_not_found(self, client):
-        response = client.get("/api/v1/result/nonexistent-key")
-        assert response.status_code in (404, 500)
+    def test_result_invalid_uuid_returns_404(self, client):
+        # given
+        invalid_key = "nonexistent-key"
+
+        # when
+        response = client.get(f"/api/v1/result/{invalid_key}")
+
+        # then
+        assert response.status_code == 404

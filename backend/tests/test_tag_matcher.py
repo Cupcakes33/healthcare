@@ -184,6 +184,30 @@ class TestTagMatcher:
         assert results == []
 
     @pytest.mark.asyncio
+    async def test_no_match_returns_fallback_when_demographics_filter_out(self, matcher, mock_session):
+        # given
+        request_female_young = MatchRequest(
+            extracted_tags=["HEADACHE"],
+            age=25,
+            gender="F",
+        )
+        first_result = MagicMock()
+        first_result.all.return_value = []
+
+        fallback_result = MagicMock()
+        fallback_result.scalar_one_or_none.return_value = None
+
+        mock_session.execute = AsyncMock(
+            side_effect=[first_result, fallback_result]
+        )
+
+        # when
+        results = await matcher.match(request_female_young)
+
+        # then
+        assert results == []
+
+    @pytest.mark.asyncio
     async def test_match_score_calculation(self, matcher, mock_session, match_request):
         # given
         matched_rows = [

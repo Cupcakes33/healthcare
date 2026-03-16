@@ -15,6 +15,7 @@ from app.domain.models import (
 from app.seed.packages import CHECKUP_ITEMS, PACKAGES, SYMPTOM_TAGS, seed
 
 
+@pytest.mark.integration
 @pytest.mark.asyncio
 async def test_seed_data():
     # given: 시드 실행
