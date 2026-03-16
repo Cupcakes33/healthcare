@@ -25,13 +25,20 @@ app.include_router(v1_router, prefix="/api/v1")
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    details = []
+    for err in exc.errors():
+        field = " → ".join(str(loc) for loc in err.get("loc", []))
+        details.append(f"{field}: {err.get('msg', '유효하지 않은 값')}")
+    message = "; ".join(details) if details else "입력값 검증에 실패했습니다"
+
     return JSONResponse(
         status_code=422,
         content={
             "success": False,
             "error": {
                 "code": "VALIDATION_ERROR",
-                "message": str(exc.errors()),
+                "message": message,
+                "details": exc.errors(),
             },
         },
     )

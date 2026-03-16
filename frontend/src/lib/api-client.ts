@@ -11,6 +11,19 @@ import type {
   StatsResponse,
 } from "@/types";
 
+function parseErrorMessage(body: unknown, fallback: string): string {
+  if (body && typeof body === "object") {
+    const obj = body as Record<string, unknown>;
+    if (obj.error && typeof obj.error === "object") {
+      const err = obj.error as Record<string, unknown>;
+      if (typeof err.message === "string") return err.message;
+    }
+    if (typeof obj.detail === "string") return obj.detail;
+    if (typeof obj.message === "string") return obj.message;
+  }
+  return fallback;
+}
+
 export async function submitQuestionnaire(
   data: QuestionnaireRequest
 ): Promise<QuestionnaireResponse> {
@@ -21,8 +34,8 @@ export async function submitQuestionnaire(
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => null);
-    throw new Error(error?.detail ?? "문진 제출에 실패했습니다");
+    const body = await response.json().catch(() => null);
+    throw new Error(parseErrorMessage(body, "문진 제출에 실패했습니다"));
   }
 
   return response.json();
@@ -34,8 +47,8 @@ export async function getResult(
   const response = await fetch(`${API_BASE_URL}/result/${sessionKey}`);
 
   if (!response.ok) {
-    const error = await response.json().catch(() => null);
-    throw new Error(error?.detail ?? "결과를 불러올 수 없습니다");
+    const body = await response.json().catch(() => null);
+    throw new Error(parseErrorMessage(body, "결과를 불러올 수 없습니다"));
   }
 
   return response.json();
@@ -74,6 +87,9 @@ export async function adminLogin(
   });
 
   if (!response.ok) {
+    if (response.status === 429) {
+      throw new Error("로그인 시도 횟수를 초과했습니다. 잠시 후 다시 시도해주세요.");
+    }
     throw new Error("아이디 또는 비밀번호가 올바르지 않습니다");
   }
 
@@ -108,8 +124,8 @@ export async function createPackage(
     body: JSON.stringify(data),
   });
   if (!response.ok) {
-    const err = await response.json().catch(() => null);
-    throw new Error(err?.detail ?? "패키지 생성에 실패했습니다");
+    const body = await response.json().catch(() => null);
+    throw new Error(parseErrorMessage(body, "패키지 생성에 실패했습니다"));
   }
   return response.json();
 }
@@ -124,8 +140,8 @@ export async function updatePackage(
     body: JSON.stringify(data),
   });
   if (!response.ok) {
-    const err = await response.json().catch(() => null);
-    throw new Error(err?.detail ?? "패키지 수정에 실패했습니다");
+    const body = await response.json().catch(() => null);
+    throw new Error(parseErrorMessage(body, "패키지 수정에 실패했습니다"));
   }
   return response.json();
 }

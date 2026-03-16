@@ -79,4 +79,4 @@ async def delete_package(
     except ValueError:
         raise HTTPException(status_code=404, detail="패키지를 찾을 수 없습니다")
     await db.commit()
-    return {"message": "패키지가 비활성화되었습니다"}
+    return {"success": True, "message": "패키지가 비활성화되었습니다"}

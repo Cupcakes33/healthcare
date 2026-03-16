@@ -94,6 +94,10 @@ export function PackageFormDialog({
   const mutError = createMut.error || updateMut.error;
 
   const onSubmit = (data: PackageFormData) => {
+    if (data.min_age > data.max_age) {
+      form.setError("min_age", { message: "최소 나이는 최대 나이보다 클 수 없습니다" });
+      return;
+    }
     if (mode === "create") {
       createMut.mutate(data, {
         onSuccess: () => {
@@ -219,23 +223,30 @@ export function PackageFormDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="pkg-min-age">최소 나이</Label>
-              <Input
-                id="pkg-min-age"
-                type="number"
-                {...form.register("min_age", { valueAsNumber: true })}
-              />
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="pkg-min-age">최소 나이</Label>
+                <Input
+                  id="pkg-min-age"
+                  type="number"
+                  {...form.register("min_age", { valueAsNumber: true, min: 0 })}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="pkg-max-age">최대 나이</Label>
+                <Input
+                  id="pkg-max-age"
+                  type="number"
+                  {...form.register("max_age", { valueAsNumber: true, min: 0 })}
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="pkg-max-age">최대 나이</Label>
-              <Input
-                id="pkg-max-age"
-                type="number"
-                {...form.register("max_age", { valueAsNumber: true })}
-              />
-            </div>
+            {form.formState.errors.min_age && (
+              <p className="text-sm text-destructive">
+                {form.formState.errors.min_age.message}
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">

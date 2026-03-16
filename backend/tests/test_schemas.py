@@ -68,6 +68,14 @@ class TestPackageCreateRequest:
                 min_age=20, max_age=60, price_range="10만", item_ids=[]
             )
 
+    def test_min_age_greater_than_max_age_rejected(self):
+        # given / when / then
+        with pytest.raises(ValidationError, match="최소 나이는 최대 나이보다 클 수 없습니다"):
+            PackageCreateRequest(
+                name="test", hospital_name="h", target_gender="ALL",
+                min_age=80, max_age=20, price_range="10만", item_ids=[1]
+            )
+
 
 class TestMatchRequest:
     def test_valid(self):
