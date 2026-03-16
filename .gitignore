@@ -1,0 +1,11 @@
+# AI 관련
+.agent/
+.agents/
+.claude/
+skills-lock.json
+docs/
+
+# IDE
+.idea/
+.vscode/
+*.iml
