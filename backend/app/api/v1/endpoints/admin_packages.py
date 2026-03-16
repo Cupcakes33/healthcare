@@ -4,17 +4,14 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
 
 from app.core.auth import require_admin
 from app.core.database import get_db
 from app.domain.schemas.admin import (
-    CheckupItemInfo,
     PackageCreateRequest,
     PackageListItem,
     PackageResponse,
     PackageUpdateRequest,
-    SymptomTagInfo,
 )
 from app.service.package_service import PackageService
 
@@ -28,22 +25,7 @@ async def list_packages(
 ):
     service = PackageService(db)
     packages = await service.get_packages(is_active=is_active)
-    return [
-        PackageListItem(
-            id=p.id,
-            name=p.name,
-            hospital_name=p.hospital_name,
-            target_gender=p.target_gender,
-            min_age=p.min_age,
-            max_age=p.max_age,
-            price_range=p.price_range,
-            is_active=p.is_active,
-            item_count=len(p.package_items) if hasattr(p, "package_items") and p.package_items else 0,
-            tag_count=len(p.package_tags) if hasattr(p, "package_tags") and p.package_tags else 0,
-            created_at=p.created_at,
-        )
-        for p in packages
-    ]
+    return [service.package_to_list_item(p) for p in packages]
 
 
 @router.get("/packages/{package_id}", response_model=PackageResponse)
@@ -57,7 +39,7 @@ async def get_package(
     except ValueError:
         raise HTTPException(status_code=404, detail="패키지를 찾을 수 없습니다")
 
-    return _build_package_response(package)
+    return service.package_to_response(package)
 
 
 @router.post("/packages", response_model=PackageResponse, status_code=201)
@@ -68,7 +50,7 @@ async def create_package(
     service = PackageService(db)
     package = await service.create_package(data)
     await db.commit()
-    return _build_package_response(package)
+    return service.package_to_response(package)
 
 
 @router.put("/packages/{package_id}", response_model=PackageResponse)
@@ -83,7 +65,7 @@ async def update_package(
     except ValueError:
         raise HTTPException(status_code=404, detail="패키지를 찾을 수 없습니다")
     await db.commit()
-    return _build_package_response(package)
+    return service.package_to_response(package)
 
 
 @router.delete("/packages/{package_id}")
@@ -98,42 +80,3 @@ async def delete_package(
         raise HTTPException(status_code=404, detail="패키지를 찾을 수 없습니다")
     await db.commit()
     return {"message": "패키지가 비활성화되었습니다"}
-
-
-def _build_package_response(package) -> PackageResponse:
-    symptom_tags = []
-    for pt in (package.package_tags or []):
-        tag = pt.symptom_tag
-        if tag:
-            symptom_tags.append(
-                SymptomTagInfo(
-                    id=tag.id,
-                    code=tag.code,
-                    name=tag.name,
-                    relevance_score=float(pt.relevance_score),
-                )
-            )
-
-    checkup_items = []
-    for pi in (package.package_items or []):
-        item = pi.item
-        if item:
-            checkup_items.append(
-                CheckupItemInfo(id=item.id, code=item.code, name=item.name)
-            )
-
-    return PackageResponse(
-        id=package.id,
-        name=package.name,
-        description=package.description,
-        hospital_name=package.hospital_name,
-        target_gender=package.target_gender,
-        min_age=package.min_age,
-        max_age=package.max_age,
-        price_range=package.price_range,
-        is_active=package.is_active,
-        symptom_tags=symptom_tags,
-        checkup_items=checkup_items,
-        created_at=package.created_at,
-        updated_at=package.updated_at,
-    )
