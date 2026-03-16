@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import abc
-from typing import Optional
+import json
+from typing import List, Optional
 
 from anthropic import AsyncAnthropic
 from openai import AsyncOpenAI
 
 from app.core.config import settings
-from app.domain.schemas.llm import LLMRequest, LLMResponse
+from app.core.prompts import build_questionnaire_prompt
+from app.domain.schemas.llm import LLMAnalysisResult, LLMRequest, LLMResponse
+from app.domain.schemas.patient import QuestionnaireRequest
 
 OPENAI_MODEL = "gpt-4o-mini"
 ANTHROPIC_MODEL = "claude-sonnet-4-20250514"
@@ -15,6 +18,10 @@ MAX_RETRIES = 1
 
 
 class LLMServiceError(Exception):
+    pass
+
+
+class LLMParsingError(LLMServiceError):
     pass
 
 
@@ -89,3 +96,53 @@ def get_llm_provider() -> LLMProvider:
             f"지원하지 않는 LLM Provider: {settings.LLM_PROVIDER}"
         )
     return factory()
+
+
+def _validate_analysis_result(
+    result: LLMAnalysisResult,
+    valid_tag_codes: List[str],
+    valid_package_ids: List[int],
+) -> LLMAnalysisResult:
+    result.extracted_tags = [
+        tag for tag in result.extracted_tags if tag in valid_tag_codes
+    ]
+    result.recommendations = [
+        rec for rec in result.recommendations
+        if rec.package_id in valid_package_ids
+    ]
+    return result
+
+
+async def analyze_questionnaire(
+    questionnaire: QuestionnaireRequest,
+    packages: List[dict],
+    symptom_tags: List[dict],
+    provider: LLMProvider,
+) -> LLMAnalysisResult:
+    system_prompt, user_prompt = build_questionnaire_prompt(
+        questionnaire, packages, symptom_tags,
+    )
+
+    valid_tag_codes = [t["code"] for t in symptom_tags]
+    valid_package_ids = [p["id"] for p in packages]
+
+    llm_request = LLMRequest(
+        system_prompt=system_prompt,
+        user_prompt=user_prompt,
+    )
+
+    for attempt in range(MAX_RETRIES + 1):
+        try:
+            response = await provider.generate(llm_request)
+            parsed = json.loads(response.content)
+            result = LLMAnalysisResult(**parsed)
+            return _validate_analysis_result(
+                result, valid_tag_codes, valid_package_ids,
+            )
+        except (json.JSONDecodeError, ValueError, KeyError) as e:
+            if attempt >= MAX_RETRIES:
+                raise LLMParsingError(
+                    f"LLM 응답 파싱 실패: {e}"
+                ) from e
+
+    raise LLMParsingError("LLM 응답 파싱 실패: 최대 재시도 초과")
