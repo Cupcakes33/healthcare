@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 from typing_extensions import Literal
@@ -38,8 +38,7 @@ class PackageRecommendation(BaseModel):
 
 class QuestionnaireResponse(BaseModel):
     session_key: str
-    summary: str
+    summary: Optional[str] = None
     input_summary: InputSummary
     red_flag: RedFlagResult
     recommendations: List[PackageRecommendation]
-    disclaimer: str
