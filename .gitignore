@@ -4,6 +4,8 @@
 .claude/
 skills-lock.json
 docs/
+tasks/
+spec/
 
 # IDE
 .idea/
