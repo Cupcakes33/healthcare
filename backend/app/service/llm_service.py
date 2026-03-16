@@ -12,9 +12,6 @@ from app.core.prompts import build_questionnaire_prompt
 from app.domain.schemas.llm import LLMAnalysisResult, LLMRequest, LLMResponse
 from app.domain.schemas.patient import QuestionnaireRequest
 
-OPENAI_MODEL = "gpt-4o-mini"
-ANTHROPIC_MODEL = "claude-sonnet-4-20250514"
-MAX_RETRIES = 1
 
 
 class LLMServiceError(Exception):
@@ -37,10 +34,10 @@ class OpenAIProvider(LLMProvider):
 
     async def generate(self, request: LLMRequest) -> LLMResponse:
         last_error: Optional[Exception] = None
-        for _ in range(MAX_RETRIES + 1):
+        for _ in range(settings.LLM_MAX_RETRIES + 1):
             try:
                 response = await self._client.chat.completions.create(
-                    model=OPENAI_MODEL,
+                    model=settings.OPENAI_MODEL,
                     messages=[
                         {"role": "system", "content": request.system_prompt},
                         {"role": "user", "content": request.user_prompt},
@@ -63,10 +60,10 @@ class AnthropicProvider(LLMProvider):
 
     async def generate(self, request: LLMRequest) -> LLMResponse:
         last_error: Optional[Exception] = None
-        for _ in range(MAX_RETRIES + 1):
+        for _ in range(settings.LLM_MAX_RETRIES + 1):
             try:
                 response = await self._client.messages.create(
-                    model=ANTHROPIC_MODEL,
+                    model=settings.ANTHROPIC_MODEL,
                     max_tokens=2048,
                     system=request.system_prompt,
                     messages=[
@@ -131,7 +128,7 @@ async def analyze_questionnaire(
         user_prompt=user_prompt,
     )
 
-    for attempt in range(MAX_RETRIES + 1):
+    for attempt in range(settings.LLM_MAX_RETRIES + 1):
         try:
             response = await provider.generate(llm_request)
             parsed = json.loads(response.content)
@@ -140,7 +137,7 @@ async def analyze_questionnaire(
                 result, valid_tag_codes, valid_package_ids,
             )
         except (json.JSONDecodeError, ValueError, KeyError) as e:
-            if attempt >= MAX_RETRIES:
+            if attempt >= settings.LLM_MAX_RETRIES:
                 raise LLMParsingError(
                     f"LLM 응답 파싱 실패: {e}"
                 ) from e

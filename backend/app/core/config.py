@@ -10,6 +10,9 @@ class Settings(BaseSettings):
     LLM_PROVIDER: str = "openai"
     OPENAI_API_KEY: str = ""
     ANTHROPIC_API_KEY: str = ""
+    OPENAI_MODEL: str = "gpt-4o-mini"
+    ANTHROPIC_MODEL: str = "claude-sonnet-4-20250514"
+    LLM_MAX_RETRIES: int = 1
 
     ADMIN_USERNAME: str = "admin"
     ADMIN_PASSWORD: str = "1111"
