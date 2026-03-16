@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import abc
 import json
-from typing import List, Optional
+from typing import List
 
 from anthropic import AsyncAnthropic
 from openai import AsyncOpenAI
@@ -33,25 +33,22 @@ class OpenAIProvider(LLMProvider):
         self._client = AsyncOpenAI(api_key=api_key)
 
     async def generate(self, request: LLMRequest) -> LLMResponse:
-        last_error: Optional[Exception] = None
-        for _ in range(settings.LLM_MAX_RETRIES + 1):
-            try:
-                response = await self._client.chat.completions.create(
-                    model=settings.OPENAI_MODEL,
-                    messages=[
-                        {"role": "system", "content": request.system_prompt},
-                        {"role": "user", "content": request.user_prompt},
-                    ],
-                    response_format={"type": "json_object"},
-                )
-                return LLMResponse(
-                    content=response.choices[0].message.content,
-                    model=response.model,
-                    provider="openai",
-                )
-            except Exception as e:
-                last_error = e
-        raise LLMServiceError(f"LLM API 호출 실패: {last_error}")
+        try:
+            response = await self._client.chat.completions.create(
+                model=settings.OPENAI_MODEL,
+                messages=[
+                    {"role": "system", "content": request.system_prompt},
+                    {"role": "user", "content": request.user_prompt},
+                ],
+                response_format={"type": "json_object"},
+            )
+            return LLMResponse(
+                content=response.choices[0].message.content,
+                model=response.model,
+                provider="openai",
+            )
+        except Exception as e:
+            raise LLMServiceError(f"LLM API 호출 실패: {e}") from e
 
 
 class AnthropicProvider(LLMProvider):
@@ -59,25 +56,22 @@ class AnthropicProvider(LLMProvider):
         self._client = AsyncAnthropic(api_key=api_key)
 
     async def generate(self, request: LLMRequest) -> LLMResponse:
-        last_error: Optional[Exception] = None
-        for _ in range(settings.LLM_MAX_RETRIES + 1):
-            try:
-                response = await self._client.messages.create(
-                    model=settings.ANTHROPIC_MODEL,
-                    max_tokens=2048,
-                    system=request.system_prompt,
-                    messages=[
-                        {"role": "user", "content": request.user_prompt},
-                    ],
-                )
-                return LLMResponse(
-                    content=response.content[0].text,
-                    model=response.model,
-                    provider="anthropic",
-                )
-            except Exception as e:
-                last_error = e
-        raise LLMServiceError(f"LLM API 호출 실패: {last_error}")
+        try:
+            response = await self._client.messages.create(
+                model=settings.ANTHROPIC_MODEL,
+                max_tokens=settings.LLM_MAX_TOKENS,
+                system=request.system_prompt,
+                messages=[
+                    {"role": "user", "content": request.user_prompt},
+                ],
+            )
+            return LLMResponse(
+                content=response.content[0].text,
+                model=response.model,
+                provider="anthropic",
+            )
+        except Exception as e:
+            raise LLMServiceError(f"LLM API 호출 실패: {e}") from e
 
 
 _PROVIDERS = {

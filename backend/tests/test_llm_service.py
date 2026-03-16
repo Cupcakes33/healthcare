@@ -86,29 +86,12 @@ class TestOpenAIProvider:
         assert result.provider == "openai"
 
     @pytest.mark.asyncio
-    async def test_generate_retry_on_failure(self, provider, llm_request):
-        mock_response = MagicMock()
-        mock_response.choices = [MagicMock()]
-        mock_response.choices[0].message.content = '{"result": "ok"}'
-        mock_response.model = "gpt-4o-mini"
-
+    async def test_generate_raises_on_failure(self, provider, llm_request):
         with patch.object(
             provider._client.chat.completions,
             "create",
             new_callable=AsyncMock,
-            side_effect=[Exception("API 오류"), mock_response],
-        ):
-            result = await provider.generate(llm_request)
-
-        assert result.content == '{"result": "ok"}'
-
-    @pytest.mark.asyncio
-    async def test_generate_raises_after_retry(self, provider, llm_request):
-        with patch.object(
-            provider._client.chat.completions,
-            "create",
-            new_callable=AsyncMock,
-            side_effect=[Exception("1차 실패"), Exception("2차 실패")],
+            side_effect=Exception("API 오류"),
         ):
             with pytest.raises(LLMServiceError, match="LLM API 호출 실패"):
                 await provider.generate(llm_request)
@@ -149,30 +132,12 @@ class TestAnthropicProvider:
         assert result.provider == "anthropic"
 
     @pytest.mark.asyncio
-    async def test_generate_retry_on_failure(self, provider, llm_request):
-        mock_content_block = MagicMock()
-        mock_content_block.text = '{"result": "ok"}'
-        mock_response = MagicMock()
-        mock_response.content = [mock_content_block]
-        mock_response.model = "claude-sonnet-4-20250514"
-
+    async def test_generate_raises_on_failure(self, provider, llm_request):
         with patch.object(
             provider._client.messages,
             "create",
             new_callable=AsyncMock,
-            side_effect=[Exception("API 오류"), mock_response],
-        ):
-            result = await provider.generate(llm_request)
-
-        assert result.content == '{"result": "ok"}'
-
-    @pytest.mark.asyncio
-    async def test_generate_raises_after_retry(self, provider, llm_request):
-        with patch.object(
-            provider._client.messages,
-            "create",
-            new_callable=AsyncMock,
-            side_effect=[Exception("1차 실패"), Exception("2차 실패")],
+            side_effect=Exception("API 오류"),
         ):
             with pytest.raises(LLMServiceError, match="LLM API 호출 실패"):
                 await provider.generate(llm_request)

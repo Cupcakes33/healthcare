@@ -6,11 +6,11 @@ from typing import List
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.domain.models import CheckupPackage, PackageSymptomTag, SymptomTag
 from app.domain.schemas.matcher import MatchRequest, MatchResult
 from app.service.package_matcher.interface import PackageMatcher
 
-MAX_RESULTS = 3
 FALLBACK_PACKAGE_NAME = "기본 종합검진"
 
 
@@ -61,7 +61,7 @@ class TagMatcher(PackageMatcher):
                 match_score=round(p["match_score"], 2),
                 matched_tags=p["matched_tags"],
             )
-            for p in sorted_packages[:MAX_RESULTS]
+            for p in sorted_packages[:settings.MAX_RECOMMENDATIONS]
         ]
 
     async def _calculate_scores(self, rows, extracted_tags: List[str]) -> dict:

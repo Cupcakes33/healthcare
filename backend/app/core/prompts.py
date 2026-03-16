@@ -61,7 +61,7 @@ SYSTEM_PROMPT = f"""당신은 의료 문진 분석 도우미입니다.
 
 {FEW_SHOT_EXAMPLE}"""
 
-GENDER_MAP = {"M": "남성", "F": "여성"}
+GENDER_MAP = {"M": "남성", "F": "여성", "ALL": "전체"}
 
 
 def build_questionnaire_prompt(

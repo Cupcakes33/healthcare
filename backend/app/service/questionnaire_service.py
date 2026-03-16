@@ -43,10 +43,12 @@ class QuestionnaireService:
 
         recommendations: List[PackageRecommendation] = []
         summary: Optional[str] = None
+        extracted_tags: List[str] = []
 
         try:
             llm_result = await self._run_llm_analysis(request, packages, symptom_tags)
             summary = llm_result.summary
+            extracted_tags = llm_result.extracted_tags
 
             recommendations = self._llm_to_recommendations(llm_result, packages)
 
@@ -56,6 +58,7 @@ class QuestionnaireService:
 
         except LLMServiceError:
             logger.warning("LLM 분석 실패, TagMatcher fallback 사용")
+            extracted_tags = request.symptoms
             tag_results = await self._run_tag_matcher(request, request.symptoms)
             recommendations = [
                 PackageRecommendation(
@@ -71,7 +74,7 @@ class QuestionnaireService:
         recommendations = recommendations[:settings.MAX_RECOMMENDATIONS]
 
         session_key = await self._save_session(
-            request, summary, red_flag, recommendations,
+            request, summary, red_flag, recommendations, extracted_tags,
         )
 
         input_summary = InputSummary(
@@ -198,6 +201,7 @@ class QuestionnaireService:
         summary: Optional[str],
         red_flag: RedFlagResult,
         recommendations: List[PackageRecommendation],
+        extracted_tags: List[str],
     ) -> str:
         session_key = str(uuid.uuid4())
 
@@ -209,7 +213,7 @@ class QuestionnaireService:
             duration=request.duration,
             underlying_conditions=request.existing_conditions,
             llm_summary=summary,
-            extracted_tags=[],
+            extracted_tags=extracted_tags,
             red_flag_level=red_flag.level,
             red_flag_details=red_flag.model_dump(),
             llm_provider=settings.LLM_PROVIDER,

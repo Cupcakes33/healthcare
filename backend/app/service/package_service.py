@@ -82,17 +82,9 @@ class PackageService:
         package.max_age = data.max_age
         package.price_range = data.price_range
 
-        await self._session.execute(
-            select(CheckupPackageItem)
-            .where(CheckupPackageItem.package_id == package_id)
-        )
         for pi in package.package_items:
             await self._session.delete(pi)
 
-        await self._session.execute(
-            select(PackageSymptomTag)
-            .where(PackageSymptomTag.package_id == package_id)
-        )
         for pt in package.package_tags:
             await self._session.delete(pt)
 

@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     OPENAI_MODEL: str = "gpt-4o-mini"
     ANTHROPIC_MODEL: str = "claude-sonnet-4-20250514"
     LLM_MAX_RETRIES: int = 1
+    LLM_MAX_TOKENS: int = 2048
     LLM_COMPLEMENT_CONFIDENCE_THRESHOLD: float = 0.75
     LLM_COMPLEMENT_MIN_RECOMMENDATIONS: int = 3
     MAX_RECOMMENDATIONS: int = 3
