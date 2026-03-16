@@ -1,0 +1,100 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+}
+
+:root {
+  /* Healthcare Color Palette */
+  /* White #FFFFFF | Tea Green #C7E7C2 | Green #A6E580 */
+  /* Forest #1F3831 | Grey #979A9B | Silver #E1E1E1 */
+
+  --background: #FFFFFF;
+  --foreground: #1F3831;
+  --card: #FFFFFF;
+  --card-foreground: #1F3831;
+  --popover: #FFFFFF;
+  --popover-foreground: #1F3831;
+  --primary: #1F3831;
+  --primary-foreground: #FFFFFF;
+  --secondary: #C7E7C2;
+  --secondary-foreground: #1F3831;
+  --muted: #C7E7C2;
+  --muted-foreground: #979A9B;
+  --accent: #A6E580;
+  --accent-foreground: #1F3831;
+  --destructive: #DC2626;
+  --border: #E1E1E1;
+  --input: #E1E1E1;
+  --ring: #A6E580;
+  --chart-1: #A6E580;
+  --chart-2: #C7E7C2;
+  --chart-3: #1F3831;
+  --chart-4: #979A9B;
+  --chart-5: #E1E1E1;
+  --radius: 0.625rem;
+  --sidebar: #FFFFFF;
+  --sidebar-foreground: #1F3831;
+  --sidebar-primary: #1F3831;
+  --sidebar-primary-foreground: #FFFFFF;
+  --sidebar-accent: #C7E7C2;
+  --sidebar-accent-foreground: #1F3831;
+  --sidebar-border: #E1E1E1;
+  --sidebar-ring: #A6E580;
+}
+
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  html {
+    @apply font-sans;
+  }
+}
