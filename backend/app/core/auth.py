@@ -42,24 +42,24 @@ def _check_rate_limit(client_ip: str) -> None:
         return
 
     attempts, locked_until = entry
-    if attempts >= MAX_LOGIN_ATTEMPTS and time.monotonic() < locked_until:
+    if locked_until and time.monotonic() < locked_until:
         raise HTTPException(
             status_code=429,
             detail="로그인 시도 횟수를 초과했습니다. 잠시 후 다시 시도해주세요.",
         )
 
-    if time.monotonic() >= locked_until:
+    if locked_until and time.monotonic() >= locked_until:
         del _login_attempts[client_ip]
 
 
 def _record_failed_attempt(client_ip: str) -> None:
     entry = _login_attempts.get(client_ip)
-    if entry is None:
-        attempts = 1
-    else:
-        attempts = entry[0] + 1
+    attempts = (entry[0] + 1) if entry else 1
 
-    locked_until = time.monotonic() + LOGIN_LOCKOUT_SECONDS
+    locked_until = None
+    if attempts >= MAX_LOGIN_ATTEMPTS:
+        locked_until = time.monotonic() + LOGIN_LOCKOUT_SECONDS
+
     _login_attempts[client_ip] = (attempts, locked_until)
 
 

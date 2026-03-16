@@ -62,7 +62,7 @@ def client(mock_db):
 
 
 class TestPostQuestionnaire:
-    async def test_valid_request_returns_201(self, client, mock_db):
+    async def test_valid_request_returns_200(self, client, mock_db):
         # given
         payload = {
             "age": 45,
@@ -82,7 +82,7 @@ class TestPostQuestionnaire:
             response = await client.post(QUESTIONNAIRE_URL, json=payload)
 
         # then
-        assert response.status_code == 201
+        assert response.status_code == 200
         data = response.json()
         assert data["session_key"] == MOCK_SESSION_KEY
         assert data["summary"] is not None

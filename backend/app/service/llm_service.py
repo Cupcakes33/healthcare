@@ -137,8 +137,8 @@ async def analyze_questionnaire(
                 raise LLMParsingError(
                     f"LLM 응답 파싱 실패: {e}"
                 ) from e
-        except LLMServiceError:
-            last_error = LLMServiceError
+        except LLMServiceError as e:
+            last_error = e
             if attempt >= settings.LLM_MAX_RETRIES:
                 raise
 

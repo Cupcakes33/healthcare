@@ -271,7 +271,7 @@ class TestAdminPackages:
         # then
         assert response.status_code == 200
         data = response.json()
-        assert data["success"] is True
+        assert data["message"] == "패키지가 비활성화되었습니다"
 
     async def test_create_without_auth_returns_401_or_403(self, client, mock_db):
         # given

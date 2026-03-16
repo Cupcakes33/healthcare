@@ -10,7 +10,7 @@ from app.service.questionnaire_service import QuestionnaireService
 router = APIRouter()
 
 
-@router.post("/questionnaire", response_model=QuestionnaireResponse, status_code=201)
+@router.post("/questionnaire", response_model=QuestionnaireResponse, status_code=200)
 async def submit_questionnaire(
     request: QuestionnaireRequest,
     db: AsyncSession = Depends(get_db),

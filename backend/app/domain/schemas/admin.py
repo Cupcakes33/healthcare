@@ -40,22 +40,7 @@ class PackageCreateRequest(BaseModel):
         return self
 
 
-class PackageUpdateRequest(BaseModel):
-    name: str
-    description: Optional[str] = None
-    hospital_name: str
-    target_gender: Literal["M", "F", "ALL"]
-    min_age: int = Field(ge=0)
-    max_age: int = Field(ge=0)
-    price_range: str
-    symptom_tags: List[SymptomTagScore] = Field(default_factory=list)
-    item_ids: List[int] = Field(min_length=1)
-
-    @model_validator(mode="after")
-    def validate_age_range(self):
-        if self.min_age > self.max_age:
-            raise ValueError("최소 나이는 최대 나이보다 클 수 없습니다")
-        return self
+PackageUpdateRequest = PackageCreateRequest
 
 
 class SymptomTagInfo(BaseModel):
