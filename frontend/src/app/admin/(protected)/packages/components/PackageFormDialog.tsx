@@ -241,14 +241,14 @@ export function PackageFormDialog({
           <div className="space-y-2">
             <Label>증상 태그</Label>
             <div className="max-h-40 overflow-y-auto rounded-lg border p-2 space-y-1">
-              {SYMPTOM_OPTIONS.map((symptom, idx) => {
-                const isSelected = selectedTagIds.has(idx + 1);
-                const tag = symptomTags.find((t) => t.symptom_tag_id === idx + 1);
+              {SYMPTOM_OPTIONS.map((symptom) => {
+                const isSelected = selectedTagIds.has(symptom.id);
+                const tag = symptomTags.find((t) => t.symptom_tag_id === symptom.id);
                 return (
                   <div key={symptom.code} className="flex items-center gap-2">
                     <Checkbox
                       checked={isSelected}
-                      onCheckedChange={() => toggleTag(idx + 1)}
+                      onCheckedChange={() => toggleTag(symptom.id)}
                     />
                     <span className="flex-1 text-sm">{symptom.name}</span>
                     {isSelected && (
@@ -256,7 +256,7 @@ export function PackageFormDialog({
                         className="h-6 rounded border text-xs"
                         value={tag?.relevance_score ?? 0.6}
                         onChange={(e) =>
-                          updateTagRelevance(idx + 1, parseFloat(e.target.value))
+                          updateTagRelevance(symptom.id, parseFloat(e.target.value))
                         }
                       >
                         {RELEVANCE_OPTIONS.map((opt) => (

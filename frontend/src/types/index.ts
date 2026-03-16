@@ -45,6 +45,7 @@ export interface QuestionnaireResponse {
 }
 
 export interface SymptomOption {
+  id: number;
   code: string;
   name: string;
   category: string;
