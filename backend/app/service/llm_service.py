@@ -34,13 +34,14 @@ class OpenAIProvider(LLMProvider):
 
     async def generate(self, request: LLMRequest) -> LLMResponse:
         try:
-            model = request.model_override or settings.OPENAI_MODEL
+            model = request.model_override or settings.ANALYSIS_MODEL
             response = await self._client.chat.completions.create(
                 model=model,
                 messages=[
                     {"role": "system", "content": request.system_prompt},
                     {"role": "user", "content": request.user_prompt},
                 ],
+                max_tokens=settings.LLM_MAX_TOKENS,
                 response_format={"type": "json_object"},
             )
             return LLMResponse(
@@ -122,6 +123,7 @@ async def analyze_questionnaire(
     llm_request = LLMRequest(
         system_prompt=system_prompt,
         user_prompt=user_prompt,
+        model_override=settings.ANALYSIS_MODEL,
     )
 
     last_error: Exception = Exception("알 수 없는 오류")
