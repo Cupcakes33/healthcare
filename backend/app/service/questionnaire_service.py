@@ -222,7 +222,7 @@ class QuestionnaireService:
             red_flag_level=red_flag.level,
             red_flag_details=red_flag.model_dump(),
             llm_provider=settings.LLM_PROVIDER,
-            llm_model=getattr(settings, f"{settings.LLM_PROVIDER.upper()}_MODEL", ""),
+            llm_model=settings.ANALYSIS_MODEL,
             input_summary={
                 "age": request.age,
                 "gender": request.gender,
