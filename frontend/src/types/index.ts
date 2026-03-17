@@ -122,6 +122,35 @@ export interface PackageDetail {
   updated_at: string;
 }
 
+export interface ChatStartRequest {
+  age: number;
+  gender: "M" | "F";
+}
+
+export interface ChatMessageRequest {
+  chat_session_id: string;
+  message: string;
+}
+
+export interface ChatCompleteRequest {
+  chat_session_id: string;
+}
+
+export interface ExtractedData {
+  symptoms: string[];
+  duration: string | null;
+  existing_conditions: string[];
+}
+
+export interface ChatResponse {
+  chat_session_id: string;
+  message: string;
+  turn: number;
+  max_turns: number;
+  is_complete: boolean;
+  extracted_so_far?: ExtractedData;
+}
+
 export interface PackageFormData {
   name: string;
   description: string;

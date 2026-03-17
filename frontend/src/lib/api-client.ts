@@ -3,6 +3,10 @@ import { getStoredToken, clearStoredToken } from "@/hooks/useAuth";
 import type {
   AdminLoginRequest,
   AdminLoginResponse,
+  ChatCompleteRequest,
+  ChatMessageRequest,
+  ChatResponse,
+  ChatStartRequest,
   PackageDetail,
   PackageFormData,
   PackageListItem,
@@ -36,6 +40,57 @@ export async function submitQuestionnaire(
   if (!response.ok) {
     const body = await response.json().catch(() => null);
     throw new Error(parseErrorMessage(body, "문진 제출에 실패했습니다"));
+  }
+
+  return response.json();
+}
+
+export async function startChat(
+  data: ChatStartRequest
+): Promise<ChatResponse> {
+  const response = await fetch(`${API_BASE_URL}/chat/start`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(parseErrorMessage(body, "채팅 세션 생성에 실패했습니다"));
+  }
+
+  return response.json();
+}
+
+export async function sendChatMessage(
+  data: ChatMessageRequest
+): Promise<ChatResponse> {
+  const response = await fetch(`${API_BASE_URL}/chat/message`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(parseErrorMessage(body, "메시지 전송에 실패했습니다"));
+  }
+
+  return response.json();
+}
+
+export async function completeChat(
+  data: ChatCompleteRequest
+): Promise<QuestionnaireResponse> {
+  const response = await fetch(`${API_BASE_URL}/chat/complete`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
+  });
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => null);
+    throw new Error(parseErrorMessage(body, "분석 요청에 실패했습니다"));
   }
 
   return response.json();
