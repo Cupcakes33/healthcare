@@ -60,6 +60,32 @@ export function DashboardContent() {
             </p>
           </CardContent>
         </Card>
+
+        <Card className="bg-secondary/30">
+          <CardHeader>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              문진 유형별
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-1 text-sm">
+              {Object.entries(data.intake_type_distribution).map(([type, count]) => {
+                const label = type === "CHAT" ? "채팅형" : "선택형";
+                const total = data.total_sessions || 1;
+                const pct = Math.round((count / total) * 100);
+                return (
+                  <li key={type} className="flex justify-between">
+                    <span>{label}</span>
+                    <span className="font-medium">{pct}% ({count}건)</span>
+                  </li>
+                );
+              })}
+              {Object.keys(data.intake_type_distribution).length === 0 && (
+                <li className="text-muted-foreground">데이터 없음</li>
+              )}
+            </ul>
+          </CardContent>
+        </Card>
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

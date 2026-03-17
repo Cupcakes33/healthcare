@@ -107,6 +107,7 @@ class PackageCount(BaseModel):
 class StatsResponse(BaseModel):
     total_sessions: int
     age_distribution: dict
+    intake_type_distribution: dict
     top_symptoms: List[SymptomCount]
     top_packages: List[PackageCount]
     red_flag_ratio: float

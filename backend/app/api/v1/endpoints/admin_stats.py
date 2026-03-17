@@ -20,6 +20,7 @@ router = APIRouter(dependencies=[Depends(require_admin)])
 async def get_stats(db: AsyncSession = Depends(get_db)):
     total = await _total_sessions(db)
     age_dist = await _age_distribution(db)
+    intake_dist = await _intake_type_distribution(db)
     top_symptoms = await _top_symptoms(db)
     top_packages = await _top_packages(db)
     red_flag = await _red_flag_ratio(db, total)
@@ -27,6 +28,7 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
     return StatsResponse(
         total_sessions=total,
         age_distribution=age_dist,
+        intake_type_distribution=intake_dist,
         top_symptoms=top_symptoms,
         top_packages=top_packages,
         red_flag_ratio=red_flag,
@@ -36,6 +38,15 @@ async def get_stats(db: AsyncSession = Depends(get_db)):
 async def _total_sessions(db: AsyncSession) -> int:
     result = await db.execute(select(func.count(IntakeSession.id)))
     return result.scalar() or 0
+
+
+async def _intake_type_distribution(db: AsyncSession) -> dict:
+    stmt = (
+        select(IntakeSession.intake_type, func.count().label("cnt"))
+        .group_by(IntakeSession.intake_type)
+    )
+    result = await db.execute(stmt)
+    return {row[0]: row[1] for row in result.all()}
 
 
 async def _age_distribution(db: AsyncSession) -> dict:

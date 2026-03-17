@@ -74,6 +74,7 @@ export interface PackageCount {
 export interface StatsResponse {
   total_sessions: number;
   age_distribution: Record<string, number>;
+  intake_type_distribution: Record<string, number>;
   top_symptoms: SymptomCount[];
   top_packages: PackageCount[];
   red_flag_ratio: number;
