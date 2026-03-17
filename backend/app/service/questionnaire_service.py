@@ -7,6 +7,7 @@ from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
+from app.core.constants import TAG_MATCHER_REASON
 from app.domain.models import IntakeSession, Recommendation
 from app.domain.schemas.llm import LLMAnalysisResult
 from app.domain.schemas.matcher import MatchRequest, MatchResult
@@ -29,7 +30,6 @@ from app.service.symptom_tag_service import SymptomTagService
 
 logger = logging.getLogger(__name__)
 
-TAG_MATCHER_REASON = "태그 매칭 기반 자동 추천"
 
 
 class QuestionnaireService:

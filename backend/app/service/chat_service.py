@@ -4,12 +4,20 @@ import json
 import logging
 import uuid
 from datetime import datetime, timedelta
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from fastapi import HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.chat_prompts import CHAT_COMPLETE_MESSAGE, CHAT_SYSTEM_PROMPT, build_greeting
+from app.core.constants import TAG_MATCHER_REASON
+from app.core.chat_prompts import (
+    CHAT_COMPLETE_MESSAGE,
+    CHAT_SYSTEM_PROMPT,
+    build_chat_analysis_prompt,
+    build_greeting,
+)
+from app.domain.models import IntakeSession, Recommendation
 from app.domain.schemas.chat import (
     ChatLLMResponse,
     ChatMessage,
@@ -17,9 +25,18 @@ from app.domain.schemas.chat import (
     ChatSessionState,
     ExtractedData,
 )
-from app.domain.schemas.llm import LLMRequest
+from app.domain.schemas.llm import LLMAnalysisResult, LLMRequest
+from app.domain.schemas.matcher import MatchRequest
+from app.domain.schemas.patient import (
+    InputSummary,
+    PackageRecommendation,
+    QuestionnaireResponse,
+)
 from app.service.llm_service import LLMProvider, LLMServiceError
+from app.service.package_matcher.tag_matcher import TagMatcher
+from app.service.package_service import PackageService
 from app.service.red_flag_service import RedFlagService
+from app.service.symptom_tag_service import SymptomTagService
 
 logger = logging.getLogger(__name__)
 
@@ -82,6 +99,241 @@ class ChatService:
 
     def remove_session(self, session_id: str) -> None:
         _chat_sessions.pop(session_id, None)
+
+    async def complete(
+        self,
+        session_id: str,
+        llm_provider: LLMProvider,
+        db: AsyncSession,
+    ) -> QuestionnaireResponse:
+        session = self.get_session(session_id)
+
+        user_messages = [m for m in session.messages if m.role == "user"]
+        if not user_messages:
+            raise HTTPException(
+                status_code=400,
+                detail="최소 1개 이상의 대화가 필요합니다",
+            )
+
+        self._check_daily_llm_limit()
+
+        packages = await PackageService(db).get_packages(is_active=True)
+        symptom_tags = await SymptomTagService(db).get_tags()
+
+        packages_dicts = [
+            {
+                "id": p.id, "name": p.name,
+                "description": p.description or "",
+                "hospital_name": p.hospital_name,
+                "target_gender": p.target_gender,
+                "min_age": p.min_age, "max_age": p.max_age,
+                "price_range": p.price_range,
+            }
+            for p in packages
+        ]
+        tags_dicts = [
+            {"code": t.code, "name": t.name, "category": t.category}
+            for t in symptom_tags
+        ]
+
+        recommendations: List[PackageRecommendation] = []
+        summary: Optional[str] = None
+        extracted_tags: List[str] = []
+
+        try:
+            llm_result = await self._run_chat_analysis(
+                session, packages_dicts, tags_dicts, llm_provider,
+            )
+            summary = llm_result.summary
+            extracted_tags = llm_result.extracted_tags
+
+            package_map = {p.id: p.name for p in packages}
+            for rec in llm_result.recommendations:
+                pkg_name = package_map.get(rec.package_id, "")
+                if pkg_name:
+                    recommendations.append(
+                        PackageRecommendation(
+                            package_id=rec.package_id,
+                            package_name=pkg_name,
+                            match_score=rec.confidence,
+                            reason=rec.reason,
+                            matched_tags=extracted_tags,
+                        )
+                    )
+
+            if (
+                llm_result.confidence < settings.LLM_COMPLEMENT_CONFIDENCE_THRESHOLD
+                or len(recommendations) < settings.LLM_COMPLEMENT_MIN_RECOMMENDATIONS
+            ):
+                tag_results = await TagMatcher(db).match(
+                    MatchRequest(
+                        extracted_tags=extracted_tags,
+                        age=session.age,
+                        gender=session.gender,
+                    )
+                )
+                existing_ids = {r.package_id for r in recommendations}
+                for r in tag_results:
+                    if r.package_id not in existing_ids:
+                        recommendations.append(
+                            PackageRecommendation(
+                                package_id=r.package_id,
+                                package_name=r.package_name,
+                                match_score=r.match_score,
+                                reason=TAG_MATCHER_REASON,
+                                matched_tags=r.matched_tags,
+                            )
+                        )
+                        existing_ids.add(r.package_id)
+
+        except LLMServiceError:
+            logger.warning("채팅 분석 LLM 실패, TagMatcher fallback 사용")
+            extracted_tags = session.extracted_data.symptoms
+            tag_results = await TagMatcher(db).match(
+                MatchRequest(
+                    extracted_tags=extracted_tags,
+                    age=session.age,
+                    gender=session.gender,
+                )
+            )
+            recommendations = [
+                PackageRecommendation(
+                    package_id=r.package_id,
+                    package_name=r.package_name,
+                    match_score=r.match_score,
+                    reason=TAG_MATCHER_REASON,
+                    matched_tags=r.matched_tags,
+                )
+                for r in tag_results
+            ]
+
+        recommendations = recommendations[:settings.MAX_RECOMMENDATIONS]
+
+        red_flag_service = RedFlagService()
+        red_flag = red_flag_service.check(extracted_tags)
+
+        extracted = session.extracted_data
+        symptom_names = extracted.symptoms or [s for s in extracted_tags]
+        duration = extracted.duration or "채팅 대화 기반"
+        existing_conditions = extracted.existing_conditions or []
+
+        input_summary = InputSummary(
+            age=session.age,
+            gender=session.gender,
+            symptoms=symptom_names,
+            duration=duration,
+            existing_conditions=existing_conditions,
+        )
+
+        chat_history = [m.model_dump() for m in session.messages]
+
+        session_key = await self._save_chat_session(
+            db, session, summary, red_flag, recommendations,
+            extracted_tags, input_summary, chat_history,
+        )
+
+        self.remove_session(session_id)
+
+        return QuestionnaireResponse(
+            session_key=session_key,
+            summary=summary,
+            input_summary=input_summary,
+            red_flag=red_flag,
+            recommendations=recommendations,
+        )
+
+    async def _run_chat_analysis(
+        self,
+        session: ChatSessionState,
+        packages: List[dict],
+        symptom_tags: List[dict],
+        llm_provider: LLMProvider,
+    ) -> LLMAnalysisResult:
+        system_prompt, user_prompt = build_chat_analysis_prompt(
+            session.messages, session.age, session.gender,
+            packages, symptom_tags,
+        )
+
+        valid_tag_codes = [t["code"] for t in symptom_tags]
+        valid_package_ids = [p["id"] for p in packages]
+
+        llm_request = LLMRequest(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            model_override=settings.ANALYSIS_MODEL,
+        )
+
+        for attempt in range(settings.LLM_MAX_RETRIES + 1):
+            try:
+                response = await llm_provider.generate(llm_request)
+                self._increment_daily_llm_count()
+                parsed = json.loads(response.content)
+                result = LLMAnalysisResult(**parsed)
+                result.extracted_tags = [
+                    t for t in result.extracted_tags if t in valid_tag_codes
+                ]
+                result.recommendations = [
+                    r for r in result.recommendations
+                    if r.package_id in valid_package_ids
+                ]
+                return result
+            except (json.JSONDecodeError, ValueError, KeyError) as e:
+                logger.warning("분석 LLM 응답 파싱 실패 (시도 %d): %s", attempt + 1, e)
+                if attempt >= settings.LLM_MAX_RETRIES:
+                    raise LLMServiceError(f"분석 LLM 응답 파싱 실패: {e}") from e
+            except LLMServiceError:
+                if attempt >= settings.LLM_MAX_RETRIES:
+                    raise
+
+        raise LLMServiceError("분석 LLM 최대 재시도 초과")
+
+    async def _save_chat_session(
+        self,
+        db: AsyncSession,
+        session: ChatSessionState,
+        summary: Optional[str],
+        red_flag,
+        recommendations: List[PackageRecommendation],
+        extracted_tags: List[str],
+        input_summary: InputSummary,
+        chat_history: List[dict],
+    ) -> str:
+        session_key = str(uuid.uuid4())
+
+        intake = IntakeSession(
+            session_key=uuid.UUID(session_key),
+            intake_type="CHAT",
+            age=session.age,
+            gender=session.gender,
+            selected_symptoms=input_summary.symptoms,
+            duration=input_summary.duration,
+            underlying_conditions=input_summary.existing_conditions,
+            llm_summary=summary,
+            extracted_tags=extracted_tags,
+            red_flag_level=red_flag.level,
+            red_flag_details=red_flag.model_dump(),
+            chat_history=chat_history,
+            llm_provider=settings.LLM_PROVIDER,
+            llm_model=settings.ANALYSIS_MODEL,
+            input_summary=input_summary.model_dump(),
+        )
+        db.add(intake)
+        await db.flush()
+
+        for idx, rec in enumerate(recommendations):
+            db.add(
+                Recommendation(
+                    session_id=intake.id,
+                    package_id=rec.package_id,
+                    rank=idx + 1,
+                    match_score=rec.match_score,
+                    reason=rec.reason,
+                    matched_tags=rec.matched_tags,
+                )
+            )
+
+        await db.flush()
+        return session_key
 
     async def process_message(
         self,
