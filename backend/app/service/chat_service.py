@@ -10,7 +10,7 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.constants import TAG_MATCHER_REASON
+from app.core.constants import INTAKE_TYPE_CHAT, TAG_MATCHER_REASON
 from app.core.chat_prompts import (
     CHAT_COMPLETE_MESSAGE,
     CHAT_SYSTEM_PROMPT,
@@ -232,8 +232,6 @@ class ChatService:
             extracted_tags, input_summary, chat_history,
         )
 
-        self.remove_session(session_id)
-
         return QuestionnaireResponse(
             session_key=session_key,
             summary=summary,
@@ -302,7 +300,7 @@ class ChatService:
 
         intake = IntakeSession(
             session_key=uuid.UUID(session_key),
-            intake_type="CHAT",
+            intake_type=INTAKE_TYPE_CHAT,
             age=session.age,
             gender=session.gender,
             selected_symptoms=input_summary.symptoms,
@@ -340,9 +338,11 @@ class ChatService:
         session_id: str,
         message: str,
         llm_provider: LLMProvider,
+        client_ip: str = "unknown",
     ) -> ChatResponse:
         session = self.get_session(session_id)
         self.validate_not_complete(session)
+        self._check_rate_limit(client_ip)
         self._check_daily_llm_limit()
 
         session.messages.append(ChatMessage(role="user", content=message))
@@ -404,7 +404,7 @@ class ChatService:
             model_override=settings.CHAT_MODEL,
         )
 
-        for attempt in range(2):
+        for attempt in range(settings.LLM_MAX_RETRIES + 1):
             try:
                 response = await llm_provider.generate(llm_request)
                 self._increment_daily_llm_count()
@@ -412,7 +412,7 @@ class ChatService:
                 return ChatLLMResponse(**parsed)
             except (json.JSONDecodeError, ValueError, KeyError) as e:
                 logger.warning("LLM 응답 파싱 실패 (시도 %d): %s", attempt + 1, e)
-                if attempt >= 1:
+                if attempt >= settings.LLM_MAX_RETRIES:
                     return None
             except LLMServiceError as e:
                 logger.error("LLM 호출 실패: %s", e)

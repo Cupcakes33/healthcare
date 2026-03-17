@@ -25,11 +25,12 @@ async def start_chat(request: ChatStartRequest, req: Request) -> ChatResponse:
 
 
 @router.post("/message", response_model=ChatResponse, status_code=200)
-async def send_message(request: ChatMessageRequest) -> ChatResponse:
+async def send_message(request: ChatMessageRequest, req: Request) -> ChatResponse:
+    client_ip = req.client.host if req.client else "unknown"
     service = ChatService()
     provider = get_llm_provider()
     return await service.process_message(
-        request.chat_session_id, request.message, provider,
+        request.chat_session_id, request.message, provider, client_ip,
     )
 
 
@@ -42,4 +43,5 @@ async def complete_chat(
     provider = get_llm_provider()
     result = await service.complete(request.chat_session_id, provider, db)
     await db.commit()
+    service.remove_session(request.chat_session_id)
     return result

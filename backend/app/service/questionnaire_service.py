@@ -7,7 +7,7 @@ from typing import List, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.constants import TAG_MATCHER_REASON
+from app.core.constants import INTAKE_TYPE_FORM, TAG_MATCHER_REASON
 from app.domain.models import IntakeSession, Recommendation
 from app.domain.schemas.llm import LLMAnalysisResult
 from app.domain.schemas.matcher import MatchRequest, MatchResult
@@ -211,7 +211,7 @@ class QuestionnaireService:
 
         intake = IntakeSession(
             session_key=uuid.UUID(session_key),
-            intake_type="FORM",
+            intake_type=INTAKE_TYPE_FORM,
             age=request.age,
             gender=request.gender,
             selected_symptoms=request.symptoms,
