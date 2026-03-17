@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field
 class LLMRequest(BaseModel):
     system_prompt: str
     user_prompt: str
+    model_override: Optional[str] = None
 
 
 class LLMResponse(BaseModel):

@@ -5,6 +5,8 @@ from typing import List, Tuple
 from app.core.prompts import FEW_SHOT_EXAMPLE, GENDER_MAP, OUTPUT_SCHEMA
 from app.domain.schemas.chat import ChatMessage
 
+CHAT_COMPLETE_MESSAGE = "충분한 정보가 수집되었습니다. 분석을 시작하겠습니다."
+
 CHAT_SYSTEM_PROMPT = """당신은 친절한 의료 문진 도우미입니다.
 환자와 대화하며 다음 정보를 자연스럽게 수집합니다:
 

@@ -34,8 +34,9 @@ class OpenAIProvider(LLMProvider):
 
     async def generate(self, request: LLMRequest) -> LLMResponse:
         try:
+            model = request.model_override or settings.OPENAI_MODEL
             response = await self._client.chat.completions.create(
-                model=settings.OPENAI_MODEL,
+                model=model,
                 messages=[
                     {"role": "system", "content": request.system_prompt},
                     {"role": "user", "content": request.user_prompt},
@@ -57,8 +58,9 @@ class AnthropicProvider(LLMProvider):
 
     async def generate(self, request: LLMRequest) -> LLMResponse:
         try:
+            model = request.model_override or settings.ANTHROPIC_MODEL
             response = await self._client.messages.create(
-                model=settings.ANTHROPIC_MODEL,
+                model=model,
                 max_tokens=settings.LLM_MAX_TOKENS,
                 system=request.system_prompt,
                 messages=[
