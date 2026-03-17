@@ -1,7 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { getStats } from "@/lib/api-client";
+import { useAdminStats } from "@/hooks/useAdmin";
 import {
   Card,
   CardContent,
@@ -10,10 +9,7 @@ import {
 } from "@/components/ui/card";
 
 export function DashboardContent() {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["admin-stats"],
-    queryFn: getStats,
-  });
+  const { data, isLoading, error } = useAdminStats();
 
   if (isLoading) {
     return (

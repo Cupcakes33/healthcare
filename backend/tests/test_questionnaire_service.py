@@ -74,11 +74,17 @@ def mock_packages():
     ]
 
 
+def _make_tag(id, code, tag_name, category):
+    tag = MagicMock(id=id, code=code, category=category)
+    tag.name = tag_name
+    return tag
+
+
 @pytest.fixture
 def mock_tags():
     return [
-        MagicMock(id=1, code="HEADACHE", name="두통", category="신경계"),
-        MagicMock(id=2, code="FATIGUE", name="피로감", category="전신"),
+        _make_tag(1, "HEADACHE", "두통", "신경계"),
+        _make_tag(2, "FATIGUE", "피로감", "전신"),
     ]
 
 
@@ -129,7 +135,7 @@ class TestQuestionnaireServiceNormalFlow:
         # then
         assert result.input_summary.age == 45
         assert result.input_summary.gender == "M"
-        assert "HEADACHE" in result.input_summary.symptoms
+        assert "두통" in result.input_summary.symptoms
 
 
 class TestQuestionnaireServiceGracefulDegradation:

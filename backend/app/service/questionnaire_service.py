@@ -73,14 +73,17 @@ class QuestionnaireService:
 
         recommendations = recommendations[:settings.MAX_RECOMMENDATIONS]
 
+        code_to_name = {t.code: t.name for t in symptom_tags}
+        symptom_names = [code_to_name.get(s, s) for s in request.symptoms]
+
         session_key = await self._save_session(
-            request, summary, red_flag, recommendations, extracted_tags,
+            request, summary, red_flag, recommendations, extracted_tags, symptom_names,
         )
 
         input_summary = InputSummary(
             age=request.age,
             gender=request.gender,
-            symptoms=request.symptoms,
+            symptoms=symptom_names,
             duration=request.duration,
             existing_conditions=request.existing_conditions,
         )
@@ -202,6 +205,7 @@ class QuestionnaireService:
         red_flag: RedFlagResult,
         recommendations: List[PackageRecommendation],
         extracted_tags: List[str],
+        symptom_names: List[str],
     ) -> str:
         session_key = str(uuid.uuid4())
 
@@ -221,7 +225,7 @@ class QuestionnaireService:
             input_summary={
                 "age": request.age,
                 "gender": request.gender,
-                "symptoms": request.symptoms,
+                "symptoms": symptom_names,
                 "duration": request.duration,
                 "existing_conditions": request.existing_conditions,
             },

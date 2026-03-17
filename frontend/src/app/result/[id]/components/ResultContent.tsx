@@ -1,7 +1,6 @@
 "use client";
 
-import { useQuery } from "@tanstack/react-query";
-import { getResult } from "@/lib/api-client";
+import { useResult } from "@/hooks/useResult";
 import { DISCLAIMER } from "@/lib/constants";
 import { RedFlagBanner } from "./RedFlagBanner";
 import { ResultCard } from "./ResultCard";
@@ -14,10 +13,7 @@ interface ResultContentProps {
 }
 
 export function ResultContent({ sessionKey }: ResultContentProps) {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["result", sessionKey],
-    queryFn: () => getResult(sessionKey),
-  });
+  const { data, isLoading, error } = useResult(sessionKey);
 
   if (isLoading) return <ResultSkeleton />;
 

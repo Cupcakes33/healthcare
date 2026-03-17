@@ -6,6 +6,7 @@ skills-lock.json
 docs/
 tasks/
 spec/
+execute.sh
 
 # IDE
 .idea/
