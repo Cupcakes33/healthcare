@@ -12,6 +12,18 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
     OPENAI_MODEL: str = "gpt-4o-mini"
     ANTHROPIC_MODEL: str = "claude-sonnet-4-20250514"
+    CHAT_MODEL: str = "gpt-4.1-nano"
+    ANALYSIS_MODEL: str = "gpt-4.1"
+
+    CHAT_MAX_TURNS: int = 8
+    CHAT_SESSION_TTL_MINUTES: int = 30
+
+    CHAT_RATE_LIMIT_PER_MINUTE: int = 5
+    CHAT_RATE_LIMIT_PER_HOUR: int = 20
+    CHAT_MAX_ACTIVE_SESSIONS: int = 100
+    DAILY_LLM_CALL_LIMIT: int = 500
+    CHAT_MESSAGE_MAX_LENGTH: int = 500
+
     LLM_MAX_RETRIES: int = 1
     LLM_MAX_TOKENS: int = 2048
     LLM_COMPLEMENT_CONFIDENCE_THRESHOLD: float = 0.75
