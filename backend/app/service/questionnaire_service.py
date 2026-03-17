@@ -211,6 +211,7 @@ class QuestionnaireService:
 
         intake = IntakeSession(
             session_key=uuid.UUID(session_key),
+            intake_type="FORM",
             age=request.age,
             gender=request.gender,
             selected_symptoms=request.symptoms,

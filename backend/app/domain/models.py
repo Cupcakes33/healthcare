@@ -114,6 +114,7 @@ class IntakeSession(Base):
 
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
     session_key: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), unique=True, nullable=False, default=uuid.uuid4)
+    intake_type: Mapped[str] = mapped_column(String(10), nullable=False, default="FORM", server_default="FORM")
     age: Mapped[int] = mapped_column(Integer, nullable=False)
     gender: Mapped[str] = mapped_column(String(10), nullable=False)
     selected_symptoms: Mapped[dict] = mapped_column(JSONB, nullable=False)
@@ -123,6 +124,7 @@ class IntakeSession(Base):
     extracted_tags: Mapped[Optional[dict]] = mapped_column(JSONB)
     red_flag_level: Mapped[str] = mapped_column(String(20), nullable=False, default="NONE")
     red_flag_details: Mapped[Optional[dict]] = mapped_column(JSONB)
+    chat_history: Mapped[Optional[dict]] = mapped_column(JSONB)
     llm_provider: Mapped[Optional[str]] = mapped_column(String(20))
     llm_model: Mapped[Optional[str]] = mapped_column(String(50))
     input_summary: Mapped[Optional[dict]] = mapped_column(JSONB)
