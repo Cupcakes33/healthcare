@@ -36,6 +36,7 @@ from app.service.llm_service import LLMProvider, LLMServiceError
 from app.service.package_matcher.tag_matcher import TagMatcher
 from app.service.package_service import PackageService
 from app.service.red_flag_service import RedFlagService
+from app.service.security import detect_injection, validate_output, validate_output_length
 from app.service.symptom_tag_service import SymptomTagService
 
 logger = logging.getLogger(__name__)
@@ -347,15 +348,19 @@ class ChatService:
 
         session.messages.append(ChatMessage(role="user", content=message))
 
-        llm_response = await self._call_chat_llm(session, llm_provider)
-
-        if llm_response is not None:
-            self._merge_extracted_data(session, llm_response.extracted)
-            reply = llm_response.reply
-            if llm_response.is_sufficient:
-                session.is_complete = True
+        if detect_injection(message):
+            logger.warning("프롬프트 인젝션 감지: session=%s", session_id)
+            reply = "죄송하지만 문진과 관련된 내용만 도움드릴 수 있습니다."
         else:
-            reply = "죄송합니다. 일시적인 오류가 발생했습니다. 다시 한번 말씀해주세요."
+            llm_response = await self._call_chat_llm(session, llm_provider)
+
+            if llm_response is not None:
+                self._merge_extracted_data(session, llm_response.extracted)
+                reply = llm_response.reply
+                if llm_response.is_sufficient:
+                    session.is_complete = True
+            else:
+                reply = "죄송합니다. 일시적인 오류가 발생했습니다. 다시 한번 말씀해주세요."
 
         session.messages.append(ChatMessage(role="assistant", content=reply))
         session.turn += 1
@@ -408,6 +413,19 @@ class ChatService:
             try:
                 response = await llm_provider.generate(llm_request)
                 self._increment_daily_llm_count()
+
+                if not validate_output(response.content):
+                    logger.warning("LLM 응답에 금지 패턴 감지 (시도 %d)", attempt + 1)
+                    if attempt >= settings.LLM_MAX_RETRIES:
+                        return None
+                    continue
+
+                if not validate_output_length(response.content, settings.CHAT_MESSAGE_MAX_LENGTH):
+                    logger.warning("LLM 응답 길이 초과 (시도 %d)", attempt + 1)
+                    if attempt >= settings.LLM_MAX_RETRIES:
+                        return None
+                    continue
+
                 parsed = json.loads(response.content)
                 return ChatLLMResponse(**parsed)
             except (json.JSONDecodeError, ValueError, KeyError) as e:
