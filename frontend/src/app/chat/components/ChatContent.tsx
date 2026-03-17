@@ -2,12 +2,17 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { useChat } from "@/hooks/useChat";
 import { ChatBubble } from "./ChatBubble";
 import { ChatInput } from "./ChatInput";
+import { TypingIndicator } from "./TypingIndicator";
+import { RedFlagBanner } from "./RedFlagBanner";
+
+const EMERGENCY_KEYWORDS = ["응급", "119", "응급실"];
 
 export function ChatContent() {
   const router = useRouter();
@@ -31,7 +36,7 @@ export function ChatContent() {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }, [messages, isLoading]);
 
   const handleStartSession = async () => {
     if (!age || !gender) return;
@@ -47,6 +52,16 @@ export function ChatContent() {
       setIsAnalyzing(false);
     }
   };
+
+  const hasEmergency = messages.some(
+    (msg) =>
+      msg.role === "assistant" &&
+      EMERGENCY_KEYWORDS.some((kw) => msg.content.includes(kw))
+  );
+
+  const isSessionExpired = error?.includes("찾을 수 없습니다");
+  const isRateLimited = error?.includes("요청 횟수");
+  const isOverloaded = error?.includes("많은 사용자");
 
   if (!sessionId) {
     return (
@@ -93,7 +108,17 @@ export function ChatContent() {
             </div>
 
             {error && (
-              <p className="text-sm text-destructive">{error}</p>
+              <div className="space-y-2">
+                <p className="text-sm text-destructive">{error}</p>
+                {isOverloaded && (
+                  <p className="text-xs text-muted-foreground">
+                    <Link href="/questionnaire" className="underline">
+                      선택형 문진
+                    </Link>
+                    을 이용해보세요.
+                  </p>
+                )}
+              </div>
             )}
 
             <Button
@@ -116,42 +141,58 @@ export function ChatContent() {
         <span className="text-sm text-muted-foreground">{turn}/{maxTurns}</span>
       </div>
 
+      {hasEmergency && (
+        <RedFlagBanner message="응급 증상이 감지되었습니다. 즉시 가까운 응급실을 방문해주세요." />
+      )}
+
       <div className="flex-1 overflow-y-auto px-4 py-4">
         <div className="mx-auto max-w-3xl space-y-3">
           {messages.map((msg, idx) => (
             <ChatBubble key={idx} message={msg} />
           ))}
-          {isLoading && (
-            <div className="flex justify-start">
-              <div className="rounded-2xl rounded-bl-sm bg-secondary px-4 py-2.5 text-sm text-muted-foreground">
-                입력 중...
-              </div>
-            </div>
-          )}
+          {isLoading && <TypingIndicator />}
           <div ref={messagesEndRef} />
         </div>
       </div>
 
       {error && (
-        <div className="border-t bg-destructive/10 px-4 py-2 text-center text-sm text-destructive">
-          {error}
+        <div className="border-t bg-destructive/10 px-4 py-3 text-center">
+          <p className="text-sm text-destructive">{error}</p>
+          {isSessionExpired && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="mt-2"
+              onClick={() => router.push("/chat")}
+            >
+              처음부터 다시 시작
+            </Button>
+          )}
+          {(isRateLimited || isOverloaded) && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              <Link href="/questionnaire" className="underline">
+                선택형 문진
+              </Link>
+              을 이용해보세요.
+            </p>
+          )}
         </div>
       )}
 
       {isComplete ? (
         <div className="border-t bg-background p-4">
-          <div className="mx-auto max-w-3xl">
+          <div className="mx-auto max-w-3xl space-y-2">
             <Button
               onClick={handleComplete}
               disabled={isAnalyzing}
               className="w-full"
             >
-              {isAnalyzing ? "분석 중..." : "분석 시작하기"}
+              {isAnalyzing ? "분석 중입니다... (약 3~5초 소요)" : "분석 시작하기"}
             </Button>
           </div>
         </div>
       ) : (
-        <ChatInput onSend={sendMessage} disabled={isLoading} />
+        <ChatInput onSend={sendMessage} disabled={isLoading || !!error} />
       )}
     </div>
   );
