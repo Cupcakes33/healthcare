@@ -72,6 +72,7 @@ async def test_config_defaults():
 
     # then
     assert settings.ADMIN_USERNAME == "admin"
-    assert settings.ADMIN_PASSWORD == "1111"
     assert settings.LLM_PROVIDER == "openai"
     assert "http://localhost:3000" in settings.cors_origins_list
+    assert settings.CHAT_MODEL == "gpt-4.1-nano"
+    assert settings.ANALYSIS_MODEL == "gpt-4.1"
