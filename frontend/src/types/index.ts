@@ -140,6 +140,7 @@ export interface ChatCompleteRequest {
 export interface ExtractedData {
   symptoms: string[];
   duration: string | null;
+  severity: string | null;
   existing_conditions: string[];
 }
 
@@ -149,6 +150,7 @@ export interface ChatResponse {
   turn: number;
   max_turns: number;
   is_complete: boolean;
+  can_analyze?: boolean;
   extracted_so_far?: ExtractedData;
 }
 

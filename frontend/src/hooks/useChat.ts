@@ -14,6 +14,7 @@ interface UseChatReturn {
   messages: ChatMessage[];
   isLoading: boolean;
   isComplete: boolean;
+  canAnalyze: boolean;
   turn: number;
   maxTurns: number;
   extractedData: ExtractedData | null;
@@ -28,6 +29,7 @@ export function useChat(): UseChatReturn {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isComplete, setIsComplete] = useState(false);
+  const [canAnalyze, setCanAnalyze] = useState(false);
   const [turn, setTurn] = useState(0);
   const [maxTurns, setMaxTurns] = useState(8);
   const [extractedData, setExtractedData] = useState<ExtractedData | null>(null);
@@ -84,6 +86,7 @@ export function useChat(): UseChatReturn {
       ]);
       setTurn(response.turn);
       setIsComplete(response.is_complete);
+      setCanAnalyze(response.can_analyze ?? false);
       if (response.extracted_so_far) {
         setExtractedData(response.extracted_so_far);
       }
@@ -118,6 +121,7 @@ export function useChat(): UseChatReturn {
     messages,
     isLoading,
     isComplete,
+    canAnalyze,
     turn,
     maxTurns,
     extractedData,

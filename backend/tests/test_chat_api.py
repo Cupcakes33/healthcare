@@ -180,7 +180,7 @@ class TestChatMessageEndpoint:
         }
 
         mock_llm_response = MagicMock()
-        mock_llm_response.content = '{"reply": "알겠습니다.", "extracted": {"symptoms": ["두통"], "duration": null, "existing_conditions": []}, "is_sufficient": false}'
+        mock_llm_response.content = '{"reply": "알겠습니다.", "extracted": {"symptoms": ["두통"], "duration": null, "severity": null, "existing_conditions": []}, "is_sufficient": false}'
 
         # when
         with patch("app.service.llm_service.get_llm_provider") as mock_provider_func:
@@ -196,6 +196,34 @@ class TestChatMessageEndpoint:
         assert data["chat_session_id"] == session_id
         assert data["turn"] == 2
         assert "message" in data
+
+    async def test_valid_message_includes_can_analyze(self, client):
+        # given
+        start_payload = {"age": 45, "gender": "M"}
+        start_response = await client.post(CHAT_START_URL, json=start_payload)
+        session_id = start_response.json()["chat_session_id"]
+
+        message_payload = {
+            "chat_session_id": session_id,
+            "message": "어제부터 두통이 있습니다.",
+        }
+
+        mock_llm_response = MagicMock()
+        mock_llm_response.content = '{"reply": "알겠습니다.", "extracted": {"symptoms": ["두통"], "duration": "어제부터", "severity": null, "existing_conditions": []}, "is_sufficient": false}'
+
+        # when
+        with patch("app.service.llm_service.get_llm_provider") as mock_provider_func:
+            mock_provider = AsyncMock()
+            mock_provider.generate = AsyncMock(return_value=mock_llm_response)
+            mock_provider_func.return_value = mock_provider
+
+            response = await client.post(CHAT_MESSAGE_URL, json=message_payload)
+
+        # then
+        assert response.status_code == 200
+        data = response.json()
+        assert "can_analyze" in data
+        assert data["can_analyze"] is True
 
     async def test_message_nonexistent_session_returns_404(self, client):
         # given
@@ -296,7 +324,7 @@ class TestChatCompleteEndpoint:
         }
 
         mock_llm_response = MagicMock()
-        mock_llm_response.content = '{"reply": "알겠습니다.", "extracted": {"symptoms": ["두통"], "duration": null, "existing_conditions": []}, "is_sufficient": true}'
+        mock_llm_response.content = '{"reply": "알겠습니다.", "extracted": {"symptoms": ["두통"], "duration": null, "severity": null, "existing_conditions": []}, "is_sufficient": true}'
 
         with patch("app.service.llm_service.get_llm_provider") as mock_provider_func:
             mock_provider = AsyncMock()
@@ -309,9 +337,7 @@ class TestChatCompleteEndpoint:
             "chat_session_id": session_id,
         }
 
-        # when - DB 의존성으로 인해 스킵
-        # complete 엔드포인트는 PackageService, SymptomTagService 등
-        # 여러 DB 서비스를 호출하므로 통합 테스트에서 다룸
+        # when
         response = await client.post(CHAT_COMPLETE_URL, json=complete_payload)
 
         # then

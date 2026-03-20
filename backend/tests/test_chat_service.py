@@ -8,7 +8,14 @@ import pytest
 from fastapi import HTTPException
 
 from app.core.config import settings
-from app.domain.schemas.chat import ChatLLMResponse, ChatMessage, ChatSessionState, ExtractedData
+from app.domain.schemas.chat import (
+    ChatLLMResponse,
+    ChatMessage,
+    ChatSessionState,
+    ExtractedData,
+    InterviewState,
+    SlotStatus,
+)
 from app.domain.schemas.llm import LLMAnalysisResult, LLMPackageRecommendation
 from app.service.chat_service import (
     ChatService,
@@ -73,6 +80,20 @@ class TestChatServiceSession:
         # then
         assert response.message is not None
         assert str(age) in response.message or "안녕" in response.message
+
+    def test_start_session_initializes_interview_state(self, chat_service):
+        # given
+        age = 30
+        gender = "F"
+        client_ip = "192.168.1.1"
+
+        # when
+        response = chat_service.start_session(age, gender, client_ip)
+        session = chat_service.get_session(response.chat_session_id)
+
+        # then
+        assert session.interview_state.last_asked_slot == "symptom"
+        assert session.interview_state.symptom.status == SlotStatus.NOT_ASKED
 
     def test_get_session_returns_existing_session(self, chat_service):
         # given
@@ -425,3 +446,270 @@ class TestChatServiceSecurity:
 
         assert exc_info.value.status_code == 503
         assert "일일 서비스 이용 한도" in exc_info.value.detail
+
+
+class TestInterviewState:
+
+    @pytest.mark.asyncio
+    async def test_slot_state_tracking_after_llm_response(
+        self, chat_service, mock_llm_provider
+    ):
+        # given
+        response = chat_service.start_session(30, "F", "192.168.1.1")
+        session_id = response.chat_session_id
+
+        llm_response = ChatLLMResponse(
+            reply="언제부터 두통이 시작되었나요?",
+            extracted=ExtractedData(
+                symptoms=["두통"],
+                duration=None,
+                existing_conditions=[],
+            ),
+            is_sufficient=False,
+        )
+        mock_llm_provider.generate.return_value = MagicMock(
+            content=json.dumps(llm_response.model_dump())
+        )
+
+        # when
+        await chat_service.process_message(
+            session_id, "머리가 아파요", mock_llm_provider, "192.168.1.1"
+        )
+
+        # then
+        session = chat_service.get_session(session_id)
+        assert session.interview_state.symptom.status == SlotStatus.FILLED
+        assert session.interview_state.symptom.value == "두통"
+
+    @pytest.mark.asyncio
+    async def test_negative_pattern_skips_llm_call(
+        self, chat_service, mock_llm_provider
+    ):
+        # given
+        response = chat_service.start_session(30, "F", "192.168.1.1")
+        session_id = response.chat_session_id
+        session = chat_service.get_session(session_id)
+        session.interview_state.symptom.status = SlotStatus.FILLED
+        session.interview_state.symptom.value = "두통"
+        session.interview_state.duration.status = SlotStatus.FILLED
+        session.interview_state.duration.value = "어제부터"
+        session.interview_state.last_asked_slot = "severity"
+
+        # when
+        result = await chat_service.process_message(
+            session_id, "없어요", mock_llm_provider, "192.168.1.1"
+        )
+
+        # then
+        mock_llm_provider.generate.assert_not_called()
+        assert session.interview_state.severity.status == SlotStatus.NEGATIVE
+        assert "알겠습니다" in result.message
+
+    @pytest.mark.asyncio
+    async def test_unknown_pattern_skips_llm_call(
+        self, chat_service, mock_llm_provider
+    ):
+        # given
+        response = chat_service.start_session(30, "F", "192.168.1.1")
+        session_id = response.chat_session_id
+        session = chat_service.get_session(session_id)
+        session.interview_state.symptom.status = SlotStatus.FILLED
+        session.interview_state.symptom.value = "두통"
+        session.interview_state.last_asked_slot = "duration"
+
+        # when
+        result = await chat_service.process_message(
+            session_id, "잘 모르겠어요", mock_llm_provider, "192.168.1.1"
+        )
+
+        # then
+        mock_llm_provider.generate.assert_not_called()
+        assert session.interview_state.duration.status == SlotStatus.UNKNOWN
+        assert "괜찮습니다" in result.message
+
+    @pytest.mark.asyncio
+    async def test_negative_on_last_slot_returns_completion_message(
+        self, chat_service, mock_llm_provider
+    ):
+        # given
+        response = chat_service.start_session(30, "F", "192.168.1.1")
+        session_id = response.chat_session_id
+        session = chat_service.get_session(session_id)
+        session.interview_state.symptom.status = SlotStatus.FILLED
+        session.interview_state.duration.status = SlotStatus.FILLED
+        session.interview_state.severity.status = SlotStatus.FILLED
+        session.interview_state.last_asked_slot = "history"
+
+        # when
+        result = await chat_service.process_message(
+            session_id, "아니요", mock_llm_provider, "192.168.1.1"
+        )
+
+        # then
+        assert "충분한 정보가 수집되었습니다" in result.message
+
+    @pytest.mark.asyncio
+    async def test_can_analyze_in_response(
+        self, chat_service, mock_llm_provider
+    ):
+        # given
+        response = chat_service.start_session(30, "F", "192.168.1.1")
+        session_id = response.chat_session_id
+
+        llm_response = ChatLLMResponse(
+            reply="언제부터 시작되었나요?",
+            extracted=ExtractedData(
+                symptoms=["두통"],
+                duration="어제부터",
+                existing_conditions=[],
+            ),
+            is_sufficient=False,
+        )
+        mock_llm_provider.generate.return_value = MagicMock(
+            content=json.dumps(llm_response.model_dump())
+        )
+
+        # when
+        result = await chat_service.process_message(
+            session_id, "어제부터 두통이 있어요", mock_llm_provider, "192.168.1.1"
+        )
+
+        # then
+        assert result.can_analyze is True
+
+    @pytest.mark.asyncio
+    async def test_is_sufficient_from_llm_ignored(
+        self, chat_service, mock_llm_provider
+    ):
+        # given
+        response = chat_service.start_session(30, "F", "192.168.1.1")
+        session_id = response.chat_session_id
+
+        llm_response = ChatLLMResponse(
+            reply="충분히 수집했습니다.",
+            extracted=ExtractedData(
+                symptoms=["두통"],
+                duration=None,
+                existing_conditions=[],
+            ),
+            is_sufficient=True,
+        )
+        mock_llm_provider.generate.return_value = MagicMock(
+            content=json.dumps(llm_response.model_dump())
+        )
+
+        # when
+        result = await chat_service.process_message(
+            session_id, "두통이 있어요", mock_llm_provider, "192.168.1.1"
+        )
+
+        # then
+        assert result.is_complete is False
+
+
+class TestShouldOfferAnalysis:
+
+    def test_symptom_filled_plus_one_more_returns_true(self, chat_service):
+        # given
+        state = InterviewState()
+        state.symptom.status = SlotStatus.FILLED
+        state.duration.status = SlotStatus.FILLED
+
+        # when/then
+        assert chat_service._should_offer_analysis(state) is True
+
+    def test_symptom_filled_alone_returns_false(self, chat_service):
+        # given
+        state = InterviewState()
+        state.symptom.status = SlotStatus.FILLED
+
+        # when/then
+        assert chat_service._should_offer_analysis(state) is False
+
+    def test_no_symptom_but_others_filled_returns_false(self, chat_service):
+        # given
+        state = InterviewState()
+        state.duration.status = SlotStatus.FILLED
+        state.severity.status = SlotStatus.FILLED
+        state.history.status = SlotStatus.NEGATIVE
+
+        # when/then
+        assert chat_service._should_offer_analysis(state) is False
+
+    def test_symptom_plus_negative_counts_as_asked(self, chat_service):
+        # given
+        state = InterviewState()
+        state.symptom.status = SlotStatus.FILLED
+        state.duration.status = SlotStatus.NEGATIVE
+
+        # when/then
+        assert chat_service._should_offer_analysis(state) is True
+
+
+class TestTextRedFlags:
+
+    def test_detects_korean_emergency_keywords(self, chat_service):
+        # given/when/then
+        assert chat_service._check_text_red_flags("죽을 것 같아요") == ["죽을 것 같"]
+        assert chat_service._check_text_red_flags("숨이 차고 흉통이 있어요") == ["숨이 차", "흉통"]
+        assert chat_service._check_text_red_flags("정신을 잃었어요") == ["정신을 잃"]
+
+    def test_no_match_returns_empty(self, chat_service):
+        # given/when/then
+        assert chat_service._check_text_red_flags("머리가 아파요") == []
+        assert chat_service._check_text_red_flags("배가 아파요") == []
+
+    @pytest.mark.asyncio
+    async def test_text_red_flag_completes_session(
+        self, chat_service, mock_llm_provider
+    ):
+        # given
+        response = chat_service.start_session(30, "F", "192.168.1.1")
+        session_id = response.chat_session_id
+
+        llm_response = ChatLLMResponse(
+            reply="증상이 심각해 보입니다.",
+            extracted=ExtractedData(symptoms=["흉통"], existing_conditions=[]),
+            is_sufficient=False,
+        )
+        mock_llm_provider.generate.return_value = MagicMock(
+            content=json.dumps(llm_response.model_dump())
+        )
+
+        # when
+        result = await chat_service.process_message(
+            session_id, "흉통이 심해요", mock_llm_provider, "192.168.1.1"
+        )
+
+        # then
+        assert result.is_complete is True
+        assert "응급" in result.message
+
+
+class TestProcessMessageRateLimitRemoved:
+
+    @pytest.mark.asyncio
+    async def test_process_message_does_not_check_rate_limit(
+        self, chat_service, mock_llm_provider
+    ):
+        # given
+        response = chat_service.start_session(30, "F", "192.168.1.1")
+        session_id = response.chat_session_id
+
+        llm_response = ChatLLMResponse(
+            reply="알겠습니다.",
+            extracted=ExtractedData(symptoms=["두통"], existing_conditions=[]),
+            is_sufficient=False,
+        )
+        mock_llm_provider.generate.return_value = MagicMock(
+            content=json.dumps(llm_response.model_dump())
+        )
+
+        # when
+        with patch.object(chat_service, "_check_rate_limit") as mock_rate_limit:
+            await chat_service.process_message(
+                session_id, "두통이 있어요", mock_llm_provider, "192.168.1.1"
+            )
+
+            # then
+            mock_rate_limit.assert_not_called()

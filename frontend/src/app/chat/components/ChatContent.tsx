@@ -20,6 +20,7 @@ export function ChatContent() {
     messages,
     isLoading,
     isComplete,
+    canAnalyze,
     turn,
     maxTurns,
     error,
@@ -179,21 +180,30 @@ export function ChatContent() {
         </div>
       )}
 
-      {isComplete ? (
-        <div className="border-t bg-background p-4">
-          <div className="mx-auto max-w-3xl space-y-2">
+      <div className="border-t bg-background p-4">
+        <div className="mx-auto max-w-3xl space-y-2">
+          {canAnalyze && !isComplete && (
+            <p className="text-sm text-muted-foreground text-center">
+              충분한 정보가 수집되었습니다. 바로 분석하거나, 대화를 계속할 수 있습니다.
+            </p>
+          )}
+
+          {turn > 1 && (
             <Button
               onClick={handleComplete}
-              disabled={isAnalyzing}
+              disabled={isAnalyzing || isLoading}
+              variant={canAnalyze ? "default" : "outline"}
               className="w-full"
             >
               {isAnalyzing ? "분석 중입니다... (약 3~5초 소요)" : "분석 시작하기"}
             </Button>
-          </div>
+          )}
+
+          {!isComplete && (
+            <ChatInput onSend={sendMessage} disabled={isLoading || !!error} />
+          )}
         </div>
-      ) : (
-        <ChatInput onSend={sendMessage} disabled={isLoading || !!error} />
-      )}
+      </div>
     </div>
   );
 }
