@@ -10,7 +10,13 @@ from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
-from app.core.constants import INTAKE_TYPE_CHAT, TAG_MATCHER_REASON
+from app.core.constants import (
+    INTAKE_TYPE_CHAT,
+    NEGATIVE_PATTERNS,
+    RED_FLAG_KEYWORDS,
+    TAG_MATCHER_REASON,
+    UNKNOWN_PATTERNS,
+)
 from app.core.chat_prompts import (
     CHAT_COMPLETE_MESSAGE,
     CHAT_SYSTEM_PROMPT,
@@ -24,6 +30,8 @@ from app.domain.schemas.chat import (
     ChatResponse,
     ChatSessionState,
     ExtractedData,
+    InterviewState,
+    SlotStatus,
 )
 from app.domain.schemas.llm import LLMAnalysisResult, LLMRequest
 from app.domain.schemas.matcher import MatchRequest
@@ -45,6 +53,13 @@ _chat_sessions: Dict[str, ChatSessionState] = {}
 _rate_limit_records: Dict[str, List[datetime]] = {}
 _daily_llm_call_count: Dict[str, int] = {}
 
+SLOT_NAMES = ["symptom", "duration", "severity", "history"]
+SLOT_QUESTIONS = {
+    "symptom": "어떤 증상이 있으신가요?",
+    "duration": "증상이 언제부터 시작되었나요?",
+    "severity": "증상이 얼마나 심한 편인가요?",
+    "history": "기저질환이나 과거 병력이 있으신가요?",
+}
 
 
 class ChatService:
@@ -67,6 +82,7 @@ class ChatService:
             turn=1,
             max_turns=settings.CHAT_MAX_TURNS,
             extracted_data=ExtractedData(),
+            interview_state=InterviewState(last_asked_slot="symptom"),
             is_complete=False,
             created_at=datetime.utcnow(),
         )
@@ -343,24 +359,34 @@ class ChatService:
     ) -> ChatResponse:
         session = self.get_session(session_id)
         self.validate_not_complete(session)
-        self._check_rate_limit(client_ip)
         self._check_daily_llm_limit()
 
         session.messages.append(ChatMessage(role="user", content=message))
+
+        text_red_flags = self._check_text_red_flags(message)
+        if text_red_flags:
+            session.interview_state.red_flags.extend(text_red_flags)
 
         if detect_injection(message):
             logger.warning("프롬프트 인젝션 감지: session=%s", session_id)
             reply = "죄송하지만 문진과 관련된 내용만 도움드릴 수 있습니다."
         else:
-            llm_response = await self._call_chat_llm(session, llm_provider)
-
-            if llm_response is not None:
-                self._merge_extracted_data(session, llm_response.extracted)
-                reply = llm_response.reply
-                if llm_response.is_sufficient:
-                    session.is_complete = True
+            short_reply = self._try_short_answer_handling(session, message)
+            if short_reply is not None:
+                reply = short_reply
             else:
-                reply = "죄송합니다. 일시적인 오류가 발생했습니다. 다시 한번 말씀해주세요."
+                llm_response = await self._call_chat_llm(session, llm_provider)
+
+                if llm_response is not None:
+                    self._merge_extracted_data(session, llm_response.extracted)
+                    self._update_interview_state(session, llm_response.extracted)
+                    reply = llm_response.reply
+                else:
+                    reply = "죄송합니다. 일시적인 오류가 발생했습니다. 다시 한번 말씀해주세요."
+
+        next_slot = self._get_next_slot(session.interview_state)
+        if next_slot:
+            session.interview_state.last_asked_slot = next_slot
 
         session.messages.append(ChatMessage(role="assistant", content=reply))
         session.turn += 1
@@ -372,10 +398,18 @@ class ChatService:
             reply = f"{red_flag.message} {reply}"
             session.messages[-1] = ChatMessage(role="assistant", content=reply)
 
+        if text_red_flags:
+            session.is_complete = True
+            emergency_msg = "⚠️ 응급 증상이 감지되었습니다. 즉시 119에 전화하거나 가까운 응급실을 방문해주세요."
+            reply = f"{emergency_msg} {reply}"
+            session.messages[-1] = ChatMessage(role="assistant", content=reply)
+
         if session.turn >= session.max_turns and not session.is_complete:
             session.is_complete = True
             reply = f"{reply}\n\n{CHAT_COMPLETE_MESSAGE}"
             session.messages[-1] = ChatMessage(role="assistant", content=reply)
+
+        can_analyze = self._should_offer_analysis(session.interview_state)
 
         return ChatResponse(
             chat_session_id=session_id,
@@ -383,8 +417,89 @@ class ChatService:
             turn=session.turn,
             max_turns=session.max_turns,
             is_complete=session.is_complete,
+            can_analyze=can_analyze,
             extracted_so_far=session.extracted_data,
         )
+
+    def _check_text_red_flags(self, message: str) -> list[str]:
+        matched = []
+        for keyword in RED_FLAG_KEYWORDS:
+            if keyword in message:
+                matched.append(keyword)
+        return matched
+
+    def _try_short_answer_handling(
+        self, session: ChatSessionState, message: str
+    ) -> str | None:
+        last_slot = session.interview_state.last_asked_slot
+        if not last_slot:
+            return None
+
+        for pattern in NEGATIVE_PATTERNS:
+            if pattern in message:
+                slot = getattr(session.interview_state, last_slot, None)
+                if slot is not None:
+                    slot.status = SlotStatus.NEGATIVE
+                    slot.value = message
+
+                next_slot = self._get_next_slot(session.interview_state)
+                if next_slot:
+                    return f"알겠습니다. {SLOT_QUESTIONS[next_slot]}"
+                return "알겠습니다. 충분한 정보가 수집되었습니다."
+
+        for pattern in UNKNOWN_PATTERNS:
+            if pattern in message:
+                slot = getattr(session.interview_state, last_slot, None)
+                if slot is not None:
+                    slot.status = SlotStatus.UNKNOWN
+                    slot.value = message
+
+                next_slot = self._get_next_slot(session.interview_state)
+                if next_slot:
+                    return f"괜찮습니다. {SLOT_QUESTIONS[next_slot]}"
+                return "괜찮습니다. 충분한 정보가 수집되었습니다."
+
+        return None
+
+    def _update_interview_state(
+        self, session: ChatSessionState, extracted: ExtractedData
+    ) -> None:
+        state = session.interview_state
+
+        if extracted.symptoms:
+            state.symptom.status = SlotStatus.FILLED
+            state.symptom.value = ", ".join(extracted.symptoms)
+
+        if extracted.duration:
+            state.duration.status = SlotStatus.FILLED
+            state.duration.value = extracted.duration
+
+        if extracted.severity:
+            state.severity.status = SlotStatus.FILLED
+            state.severity.value = extracted.severity
+
+        if extracted.existing_conditions:
+            state.history.status = SlotStatus.FILLED
+            state.history.value = ", ".join(extracted.existing_conditions)
+
+    def _should_offer_analysis(self, state: InterviewState) -> bool:
+        asked_or_filled = 0
+        for slot_name in SLOT_NAMES:
+            slot: SlotState = getattr(state, slot_name)
+            if slot.status != SlotStatus.NOT_ASKED:
+                asked_or_filled += 1
+
+        if state.symptom.status == SlotStatus.FILLED and asked_or_filled >= 2:
+            return True
+
+        return False
+
+    def _get_next_slot(self, state: InterviewState) -> str | None:
+        for slot_name in SLOT_NAMES:
+            slot: SlotState = getattr(state, slot_name)
+            if slot.status == SlotStatus.NOT_ASKED:
+                return slot_name
+        return None
 
     async def _call_chat_llm(
         self,
@@ -397,9 +512,21 @@ class ChatService:
             if m.role != "system"
         )
 
+        slot_status_lines = []
+        for slot_name in SLOT_NAMES:
+            slot: SlotState = getattr(session.interview_state, slot_name)
+            label = {"symptom": "증상", "duration": "기간", "severity": "강도", "history": "과거력"}[slot_name]
+            slot_status_lines.append(f"- {label}: {slot.status.value} ({slot.value or '미수집'})")
+
+        slot_info = "\n".join(slot_status_lines)
+        next_slot = self._get_next_slot(session.interview_state)
+        next_slot_label = {"symptom": "증상", "duration": "기간", "severity": "강도", "history": "과거력"}.get(next_slot, "없음") if next_slot else "없음"
+
         user_prompt = (
             f"환자 정보: {session.age}세, "
             f"{'남성' if session.gender == 'M' else '여성'}\n\n"
+            f"현재 슬롯 상태:\n{slot_info}\n\n"
+            f"이번 턴 목표 항목: {next_slot_label}\n\n"
             f"대화 내용:\n{conversation}"
         )
 
@@ -445,6 +572,8 @@ class ChatService:
         existing.symptoms = list(set(existing.symptoms) | set(new.symptoms))
         if new.duration and not existing.duration:
             existing.duration = new.duration
+        if new.severity and not existing.severity:
+            existing.severity = new.severity
         existing.existing_conditions = list(
             set(existing.existing_conditions) | set(new.existing_conditions)
         )

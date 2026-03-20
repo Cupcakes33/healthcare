@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
+from enum import Enum
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 from typing_extensions import Literal
@@ -21,9 +22,31 @@ class ChatCompleteRequest(BaseModel):
     chat_session_id: str
 
 
+class SlotStatus(str, Enum):
+    NOT_ASKED = "NOT_ASKED"
+    FILLED = "FILLED"
+    NEGATIVE = "NEGATIVE"
+    UNKNOWN = "UNKNOWN"
+
+
+class SlotState(BaseModel):
+    status: SlotStatus = SlotStatus.NOT_ASKED
+    value: Optional[str] = None
+
+
+class InterviewState(BaseModel):
+    symptom: SlotState = Field(default_factory=SlotState)
+    duration: SlotState = Field(default_factory=SlotState)
+    severity: SlotState = Field(default_factory=SlotState)
+    history: SlotState = Field(default_factory=SlotState)
+    last_asked_slot: Optional[str] = None
+    red_flags: List[str] = Field(default_factory=list)
+
+
 class ExtractedData(BaseModel):
     symptoms: List[str] = Field(default_factory=list)
     duration: Optional[str] = None
+    severity: Optional[str] = None
     existing_conditions: List[str] = Field(default_factory=list)
 
 
@@ -33,6 +56,7 @@ class ChatResponse(BaseModel):
     turn: int
     max_turns: int
     is_complete: bool
+    can_analyze: bool = False
     extracted_so_far: Optional[ExtractedData] = None
 
 
@@ -55,5 +79,6 @@ class ChatSessionState(BaseModel):
     turn: int = 0
     max_turns: int = 8
     extracted_data: ExtractedData = Field(default_factory=ExtractedData)
+    interview_state: InterviewState = Field(default_factory=InterviewState)
     is_complete: bool = False
     created_at: datetime
