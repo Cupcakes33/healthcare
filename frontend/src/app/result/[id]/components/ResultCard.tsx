@@ -6,6 +6,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { symptomCodeToKorean } from "@/lib/constants";
 import type { PackageRecommendation } from "@/types";
 
 interface ResultCardProps {
@@ -40,7 +41,7 @@ export function ResultCard({ recommendation, rank }: ResultCardProps) {
                 key={tag}
                 className="rounded-md bg-secondary px-2 py-0.5 text-xs text-secondary-foreground"
               >
-                {tag}
+                {symptomCodeToKorean(tag)}
               </span>
             ))}
           </div>

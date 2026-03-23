@@ -65,6 +65,14 @@ export const CHECKUP_ITEMS = [
   { id: 12, code: "KIDNEY_FUNCTION", name: "신기능검사" },
 ];
 
+const SYMPTOM_CODE_TO_NAME: Record<string, string> = Object.fromEntries(
+  SYMPTOM_OPTIONS.map((s) => [s.code, s.name])
+);
+
+export function symptomCodeToKorean(code: string): string {
+  return SYMPTOM_CODE_TO_NAME[code] ?? code;
+}
+
 export const TOTAL_STEPS = 3;
 
 export const DISCLAIMER =

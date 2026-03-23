@@ -71,7 +71,12 @@ export function PackageTable() {
           <TableBody>
             {packages?.map((pkg) => (
               <TableRow key={pkg.id}>
-                <TableCell className="font-medium">{pkg.name}</TableCell>
+                <TableCell>
+                  <div className="font-medium">{pkg.name}</div>
+                  <div className="mt-0.5 text-xs text-muted-foreground md:hidden">
+                    {pkg.hospital_name} · {pkg.price_range}
+                  </div>
+                </TableCell>
                 <TableCell className="hidden md:table-cell">
                   {pkg.hospital_name}
                 </TableCell>
