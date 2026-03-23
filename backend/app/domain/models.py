@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime
 from typing import Optional
 
 from sqlalchemy import (
@@ -30,7 +31,7 @@ class SymptomTag(Base):
     code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     category: Mapped[str] = mapped_column(String(50), nullable=False)
-    created_at: Mapped[str] = mapped_column(server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     package_tags: Mapped[list["PackageSymptomTag"]] = relationship(back_populates="symptom_tag")
 
@@ -46,7 +47,7 @@ class CheckupItem(Base):
     code: Mapped[str] = mapped_column(String(50), unique=True, nullable=False)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text)
-    created_at: Mapped[str] = mapped_column(server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     package_items: Mapped[list["CheckupPackageItem"]] = relationship(back_populates="item")
 
@@ -63,8 +64,8 @@ class CheckupPackage(Base):
     max_age: Mapped[int] = mapped_column(Integer, nullable=False)
     price_range: Mapped[str] = mapped_column(String(50), nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="true")
-    created_at: Mapped[str] = mapped_column(server_default=func.now())
-    updated_at: Mapped[str] = mapped_column(server_default=func.now(), onupdate=func.now())
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(server_default=func.now(), onupdate=func.now())
 
     package_items: Mapped[list["CheckupPackageItem"]] = relationship(back_populates="package")
     package_tags: Mapped[list["PackageSymptomTag"]] = relationship(back_populates="package")
@@ -128,7 +129,7 @@ class IntakeSession(Base):
     llm_provider: Mapped[Optional[str]] = mapped_column(String(20))
     llm_model: Mapped[Optional[str]] = mapped_column(String(50))
     input_summary: Mapped[Optional[dict]] = mapped_column(JSONB)
-    created_at: Mapped[str] = mapped_column(server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     recommendations: Mapped[list["Recommendation"]] = relationship(back_populates="session")
 
@@ -153,7 +154,7 @@ class Recommendation(Base):
     match_score: Mapped[float] = mapped_column(Numeric(3, 2), nullable=False)
     reason: Mapped[Optional[str]] = mapped_column(Text)
     matched_tags: Mapped[Optional[dict]] = mapped_column(JSONB)
-    created_at: Mapped[str] = mapped_column(server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
 
     session: Mapped["IntakeSession"] = relationship(back_populates="recommendations")
     package: Mapped["CheckupPackage"] = relationship(back_populates="recommendations")
