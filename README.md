@@ -243,6 +243,13 @@ erDiagram
         varchar category
     }
 
+    checkup_item {
+        bigint id PK
+        varchar code UK
+        varchar name
+        text description
+    }
+
     checkup_package {
         bigint id PK
         varchar name
@@ -254,11 +261,17 @@ erDiagram
         boolean is_active
     }
 
+    checkup_package_item {
+        bigint id PK
+        bigint package_id FK
+        bigint item_id FK
+    }
+
     package_symptom_tag {
         bigint id PK
         bigint package_id FK
         bigint symptom_tag_id FK
-        numeric relevance_score
+        numeric relevance_score "0.0~1.0"
     }
 
     intake_session {
@@ -285,6 +298,8 @@ erDiagram
 
     symptom_tag ||--o{ package_symptom_tag : tagged_in
     checkup_package ||--o{ package_symptom_tag : has_tags
+    checkup_package ||--o{ checkup_package_item : contains
+    checkup_item ||--o{ checkup_package_item : included_in
     intake_session ||--o{ recommendation : receives
     checkup_package ||--o{ recommendation : recommended_in
 ```
